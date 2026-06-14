@@ -1,6 +1,6 @@
 import type { CubeCoordinate, CubeFace, CubeSurfaceCoordinate } from './types';
 
-export const CUBE_FACES: CubeFace[] = ['front', 'right', 'back', 'left', 'top', 'bottom'];
+export const CUBE_FACES = ['front', 'right', 'back', 'left', 'top', 'bottom'] as const satisfies readonly CubeFace[];
 
 type Edge = 'top' | 'right' | 'bottom' | 'left';
 type EdgeMapper = (index: number, size: number) => CubeCoordinate;
@@ -97,6 +97,7 @@ function mapSurfaceNeighbor(coordinate: CubeSurfaceCoordinate, rowOffset: number
     return null;
   }
 
+  // Cube Mode V1 allows diagonals only within a face; crossing faces is orthogonal-only.
   if (rowOffset !== 0 && colOffset !== 0) {
     return null;
   }
