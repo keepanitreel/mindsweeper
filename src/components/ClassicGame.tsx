@@ -146,8 +146,7 @@ export default function ClassicGame() {
   );
 
   return (
-    <main className="app-shell">
-      <section className="game-panel" aria-label="Microsoft-style Minesweeper Classic Mode">
+    <section className="game-panel" aria-label="Microsoft-style Minesweeper Classic Mode">
         <header className="game-header">
           <div>
             <p className="eyebrow">Classic Mode</p>
@@ -237,8 +236,7 @@ export default function ClassicGame() {
             </div>
           </div>
         ) : null}
-      </section>
-    </main>
+    </section>
   );
 }
 

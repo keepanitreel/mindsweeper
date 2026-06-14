@@ -18,6 +18,13 @@ describe('Minesweeper app', () => {
     expect(screen.getAllByRole('gridcell', { name: /covered cell/i })).toHaveLength(81);
   });
 
+  it('renders one page-level main landmark', () => {
+    render(<App />);
+
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(screen.getByRole('main')).toHaveClass('app-shell');
+  });
+
   it('reveals and flags cells from the board', async () => {
     const user = userEvent.setup();
     render(<App />);
