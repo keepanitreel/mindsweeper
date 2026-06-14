@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { createInitialCubeGame, revealCubeCell } from './game/cube/engine';
-import { getDepthStackCoordinates, getSurfaceNeighbors } from './game/cube/geometry';
+import { getSurfaceNeighbors } from './game/cube/geometry';
 import { CUBE_PRESETS } from './game/cube/presets';
 import type { CubeCell, CubeCoordinate, CubeGameState } from './game/cube/types';
 
@@ -105,7 +105,26 @@ describe('Minesweeper app', () => {
     expect(screen.getAllByRole('gridcell', { name: /covered cube cell/i }).length).toBeGreaterThan(0);
   });
 
-  it('renders the expanded Standard and Deep cube presets', async () => {
+  it('keeps Cube Mode surface-only without depth affordances', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+
+    const difficulty = screen.getByLabelText('Cube difficulty');
+    expect(difficulty).toHaveTextContent('Starter Cube');
+    expect(difficulty).toHaveTextContent('Standard Cube');
+    expect(difficulty).not.toHaveTextContent('Deep Cube');
+
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+
+    expect(screen.queryByText(/^Depth /i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/depth stack/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('gridcell', { name: /depth mines/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the expanded Standard cube preset', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -118,11 +137,6 @@ describe('Minesweeper app', () => {
     expect(cubeStage!.style.getPropertyValue('--cube-size')).toBe('10');
     expect(cubeStage!.style.getPropertyValue('--cube-cell-size')).toBe('clamp(24px, calc((100vw - 160px) / 10), 54px)');
     expect(screen.getByText('200')).toBeInTheDocument();
-
-    await user.selectOptions(screen.getByLabelText('Cube difficulty'), 'deep');
-    expect(cubeStage!.style.getPropertyValue('--cube-size')).toBe('20');
-    expect(cubeStage!.style.getPropertyValue('--cube-cell-size')).toBe('clamp(16px, calc((100vw - 160px) / 20), 32px)');
-    expect(screen.getByText('1280')).toBeInTheDocument();
   });
 
   it('rotates Cube Mode with keyboard arrow keys', async () => {
@@ -220,29 +234,6 @@ describe('Minesweeper app', () => {
     expect(screen.getAllByRole('gridcell', { name: /revealed cube cell/i }).length).toBeGreaterThan(revealedBefore);
   });
 
-  it('closes the Cube Mode depth stack after a terminal mine hit', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const stackSurface = findDepthStackSurface(modeledGame);
-    const stackMine = getDepthStackCoordinates(stackSurface, modeledGame.preset.hiddenDepth)
-      .map((coordinate) => modeledGame.board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col])
-      .find((cell) => cell.hasMine)!;
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(stackSurface) }));
-
-    expect(screen.getByLabelText(getDepthStackLabel(stackSurface))).toBeInTheDocument();
-
-    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(stackMine) }));
-
-    expect(screen.getByText('Mine hit')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByLabelText(getDepthStackLabel(stackSurface))).not.toBeInTheDocument());
-  });
-
   it('undoes the Cube Mode mine hit that ended the game', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
     const user = userEvent.setup();
@@ -267,162 +258,6 @@ describe('Minesweeper app', () => {
     expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(mine) })).toBeInTheDocument();
   });
 
-  it('chords a revealed Cube Mode split clue when matching surface mines are flagged', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const chordTarget = findSplitChordTarget(modeledGame);
-    const surfaceMines = getSurfaceNeighbors(chordTarget, modeledGame.preset.size)
-      .map((coordinate) => modeledGame.board[coordinate.face][0][coordinate.row][coordinate.col])
-      .filter((cell) => cell.hasMine);
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-    await user.click(screen.getByRole('button', { name: /flag mode/i }));
-    for (const mine of surfaceMines) {
-      await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(mine) }));
-    }
-    await user.click(screen.getByRole('button', { name: /flag mode/i }));
-
-    const revealedBefore = screen.getAllByRole('gridcell', { name: /revealed cube cell/i }).length;
-    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(chordTarget) }));
-
-    expect(screen.getByLabelText(getDepthStackLabel(chordTarget))).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /chord surface/i }));
-
-    expect(screen.getAllByRole('gridcell', { name: /revealed cube cell/i }).length).toBeGreaterThan(revealedBefore);
-  });
-
-  it('shows the Cube Mode depth peek when a cell receives keyboard focus', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const peekTarget = getSurfaceCells(modeledGame).find((cell) => cell.depthMineCount > 0)!;
-
-    expect(peekTarget).toBeDefined();
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-
-    const peekButton = screen.getByRole('gridcell', { name: getCubeCellLabel(peekTarget) });
-    fireEvent.focus(peekButton);
-
-    expect(screen.getByText(`Depth ${peekTarget.depthMineCount}`)).toBeInTheDocument();
-
-    fireEvent.blur(peekButton);
-
-    expect(screen.queryByText(`Depth ${peekTarget.depthMineCount}`)).not.toBeInTheDocument();
-  });
-
-  it('does not reveal a Cube Mode cell after touch press-and-hold depth peek', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-
-    vi.useFakeTimers();
-    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
-    dispatchTouchPointerEvent(peekButton, 'pointerdown');
-    act(() => {
-      vi.advanceTimersByTime(451);
-    });
-
-    expect(screen.getByText(`Depth ${peekTarget.depthMineCount}`)).toBeInTheDocument();
-
-    dispatchTouchPointerEvent(peekButton, 'pointerup');
-    fireEvent.click(peekButton);
-
-    expect(screen.queryByText(`Depth ${peekTarget.depthMineCount}`)).not.toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
-  });
-
-  it('does not flag a Cube Mode cell after touch press-and-hold depth peek context menu', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-
-    vi.useFakeTimers();
-    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
-    dispatchTouchPointerEvent(peekButton, 'pointerdown');
-    act(() => {
-      vi.advanceTimersByTime(451);
-    });
-
-    expect(screen.getByText(`Depth ${peekTarget.depthMineCount}`)).toBeInTheDocument();
-
-    fireEvent.contextMenu(peekButton);
-    dispatchTouchPointerEvent(peekButton, 'pointerup');
-
-    expect(screen.queryByRole('gridcell', { name: /flagged cube cell/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
-  });
-
-  it('allows a normal Cube Mode click after a touch peek context menu is suppressed', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const peekTarget = findCoveredSafeDepthPeekTarget(modeledGame);
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-
-    vi.useFakeTimers();
-    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
-    dispatchTouchPointerEvent(peekButton, 'pointerdown');
-    act(() => {
-      vi.advanceTimersByTime(451);
-    });
-    dispatchTouchPointerEvent(peekButton, 'pointerup');
-    fireEvent.contextMenu(peekButton);
-
-    vi.useRealTimers();
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) }));
-
-    expect(screen.getByRole('gridcell', { name: getRevealedCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
-  });
-
-  it('allows a normal Cube Mode context menu after a touch peek click is suppressed', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
-    const user = userEvent.setup();
-    const modeledGame = createModeledCubeGameAfterFirstClick();
-    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
-
-    render(<App />);
-
-    await user.click(screen.getByRole('button', { name: /cube mode/i }));
-    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
-
-    vi.useFakeTimers();
-    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
-    dispatchTouchPointerEvent(peekButton, 'pointerdown');
-    act(() => {
-      vi.advanceTimersByTime(451);
-    });
-    dispatchTouchPointerEvent(peekButton, 'pointerup');
-    fireEvent.click(peekButton);
-
-    vi.useRealTimers();
-    fireEvent.contextMenu(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) }));
-
-    expect(screen.getByRole('gridcell', { name: getFlaggedCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
-  });
 });
 
 const cubeTestRandom = 0.05;
@@ -433,40 +268,7 @@ function createModeledCubeGameAfterFirstClick(): CubeGameState {
 }
 
 function findChordTarget(game: CubeGameState): CubeCell {
-  const target = getSurfaceCells(game).find((cell) => cell.isRevealed && cell.surfaceNeighborMines > 0 && cell.depthMineCount === 0);
-
-  expect(target).toBeDefined();
-  return target!;
-}
-
-function findDepthStackSurface(game: CubeGameState): CubeCell {
-  const target = getSurfaceCells(game).find(
-    (cell) =>
-      cell.isRevealed &&
-      cell.depthMineCount > 0 &&
-      getDepthStackCoordinates(cell, game.preset.hiddenDepth).some((coordinate) => game.board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col].hasMine),
-  );
-
-  expect(target).toBeDefined();
-  return target!;
-}
-
-function findSplitChordTarget(game: CubeGameState): CubeCell {
-  const target = getSurfaceCells(game).find((cell) => cell.isRevealed && cell.surfaceNeighborMines > 0 && cell.depthMineCount > 0);
-
-  expect(target).toBeDefined();
-  return target!;
-}
-
-function findCoveredDepthPeekTarget(game: CubeGameState): CubeCell {
-  const target = getSurfaceCells(game).find((cell) => !cell.isRevealed && cell.depthMineCount > 0);
-
-  expect(target).toBeDefined();
-  return target!;
-}
-
-function findCoveredSafeDepthPeekTarget(game: CubeGameState): CubeCell {
-  const target = getSurfaceCells(game).find((cell) => !cell.isRevealed && !cell.hasMine && cell.depthMineCount > 0);
+  const target = getSurfaceCells(game).find((cell) => cell.isRevealed && cell.surfaceNeighborMines > 0);
 
   expect(target).toBeDefined();
   return target!;
@@ -492,7 +294,7 @@ function getCubeCellLabel(cell: CubeCell): string {
     return `Mine ${base}`;
   }
 
-  return `Revealed ${base} with ${cell.surfaceNeighborMines} surface mines and ${cell.depthMineCount} depth mines`;
+  return `Revealed ${base} with ${cell.surfaceNeighborMines} surface mines`;
 }
 
 function getCoveredCubeCoordinateLabel(coordinate: CubeCoordinate): string {
@@ -503,25 +305,4 @@ function getCoveredCubeCoordinateLabel(coordinate: CubeCoordinate): string {
 function getMineCubeCoordinateLabel(coordinate: CubeCoordinate): string {
   const layer = coordinate.depth === 0 ? 'surface' : `depth ${coordinate.depth}`;
   return `Mine cube cell ${coordinate.face} row ${coordinate.row + 1} column ${coordinate.col + 1} ${layer}`;
-}
-
-function getRevealedCubeCoordinateLabel(cell: CubeCell): string {
-  const layer = cell.depth === 0 ? 'surface' : `depth ${cell.depth}`;
-  return `Revealed cube cell ${cell.face} row ${cell.row + 1} column ${cell.col + 1} ${layer} with ${cell.surfaceNeighborMines} surface mines and ${cell.depthMineCount} depth mines`;
-}
-
-function getFlaggedCubeCoordinateLabel(coordinate: CubeCoordinate): string {
-  const layer = coordinate.depth === 0 ? 'surface' : `depth ${coordinate.depth}`;
-  return `Flagged cube cell ${coordinate.face} row ${coordinate.row + 1} column ${coordinate.col + 1} ${layer}`;
-}
-
-function getDepthStackLabel(surfaceCell: CubeCell): string {
-  return `Depth stack for ${surfaceCell.face} row ${surfaceCell.row + 1} column ${surfaceCell.col + 1}`;
-}
-
-function dispatchTouchPointerEvent(target: Element, type: 'pointerdown' | 'pointerup') {
-  const event = new Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'pointerId', { value: 1 });
-  Object.defineProperty(event, 'pointerType', { value: 'touch' });
-  fireEvent(target, event);
 }

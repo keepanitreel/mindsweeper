@@ -70,15 +70,6 @@ export function getSurfaceNeighbors(coordinate: CubeSurfaceCoordinate, size: num
   return neighbors;
 }
 
-export function getDepthStackCoordinates(coordinate: CubeSurfaceCoordinate, hiddenDepth: number): CubeCoordinate[] {
-  return Array.from({ length: hiddenDepth }, (_, index) => ({
-    face: coordinate.face,
-    row: coordinate.row,
-    col: coordinate.col,
-    depth: index + 1,
-  }));
-}
-
 export function coordinateKey(coordinate: CubeCoordinate): string {
   return `${coordinate.face}:${coordinate.row}:${coordinate.col}:${coordinate.depth}`;
 }

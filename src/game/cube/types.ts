@@ -1,12 +1,11 @@
 export type CubeFace = 'front' | 'right' | 'back' | 'left' | 'top' | 'bottom';
 
-export type CubePresetId = 'starter' | 'standard' | 'deep';
+export type CubePresetId = 'starter' | 'standard';
 
 export interface CubePreset {
   id: CubePresetId | string;
   label: string;
   size: number;
-  hiddenDepth: number;
   mines: number;
 }
 
@@ -29,7 +28,6 @@ export interface CubeCell {
   depth: number;
   hasMine: boolean;
   surfaceNeighborMines: number;
-  depthMineCount: number;
   isRevealed: boolean;
   isFlagged: boolean;
   isExploded: boolean;

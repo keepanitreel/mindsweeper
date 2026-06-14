@@ -5,7 +5,6 @@ import { chordCubeCell, createInitialCubeGame, revealCubeCell, toggleCubeFlag } 
 import { CUBE_PRESETS } from '../game/cube/presets';
 import type { CubeCell, CubeGameState, CubePreset } from '../game/cube/types';
 import CubeBoard, { type CubeRotation } from './CubeBoard';
-import DepthStackPopover from './DepthStackPopover';
 
 const CUBE_BEST_TIMES_KEY = 'minesweeper.cubeBestTimes';
 type CubeBestTimes = Partial<Record<string, number>>;
@@ -22,8 +21,6 @@ export default function CubeGame() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [flagMode, setFlagMode] = useState(false);
   const [rotation, setRotation] = useState<CubeRotation>({ x: -24, y: -32 });
-  const [selectedStackCell, setSelectedStackCell] = useState<CubeCell | null>(null);
-  const [peekCell, setPeekCell] = useState<CubeCell | null>(null);
   const [bestTimes, setBestTimes] = useState<CubeBestTimes>(() => readCubeBestTimes());
   const [undoSnapshot, setUndoSnapshot] = useState<CubeUndoSnapshot | null>(null);
 
@@ -53,12 +50,6 @@ export default function CubeGame() {
   }, [elapsedSeconds, game.status, preset.id]);
 
   useEffect(() => {
-    if (game.status === 'won' || game.status === 'lost') {
-      setSelectedStackCell(null);
-    }
-  }, [game.status]);
-
-  useEffect(() => {
     function handleCubeKeyboardRotation(event: KeyboardEvent) {
       const direction = getCubeRotationDirection(event.key);
 
@@ -82,8 +73,6 @@ export default function CubeGame() {
     setPreset(nextPreset);
     setGame(createInitialCubeGame(nextPreset));
     setElapsedSeconds(0);
-    setSelectedStackCell(null);
-    setPeekCell(null);
     setUndoSnapshot(null);
   }
 
@@ -102,11 +91,6 @@ export default function CubeGame() {
     const previousElapsedSeconds = elapsedSeconds;
 
     if (cell.depth === 0 && cell.isRevealed) {
-      if (cell.depthMineCount > 0) {
-        setSelectedStackCell(cell);
-        return;
-      }
-
       if (cell.surfaceNeighborMines > 0) {
         commitCubeGame(chordCubeCell(previousGame, cell), previousGame, previousElapsedSeconds);
       }
@@ -118,10 +102,6 @@ export default function CubeGame() {
 
   function handleCellFlag(cell: CubeCell) {
     setGame(toggleCubeFlag(game, cell));
-  }
-
-  function handleCellChord(cell: CubeCell) {
-    commitCubeGame(chordCubeCell(game, cell), game, elapsedSeconds);
   }
 
   function commitCubeGame(nextGame: CubeGameState, previousGame: CubeGameState, previousElapsedSeconds: number) {
@@ -142,8 +122,6 @@ export default function CubeGame() {
     setPreset(undoSnapshot.game.preset);
     setGame(undoSnapshot.game);
     setElapsedSeconds(undoSnapshot.elapsedSeconds);
-    setSelectedStackCell(null);
-    setPeekCell(null);
     setUndoSnapshot(null);
   }
 
@@ -202,21 +180,10 @@ export default function CubeGame() {
           <Gauge aria-hidden="true" />
           Best {bestTime === undefined ? '--' : `${bestTime}s`}
         </span>
-        {peekCell?.depthMineCount ? <span className="depth-peek">Depth {peekCell.depthMineCount}</span> : null}
       </div>
 
       <div className="cube-play-area">
-        <CubeBoard game={game} rotation={rotation} onRotate={setRotation} onCellPrimary={handleCellPrimary} onCellFlag={handleCellFlag} onPeek={setPeekCell} />
-        {selectedStackCell ? (
-          <DepthStackPopover
-            game={game}
-            surfaceCell={selectedStackCell}
-            onReveal={handleCellPrimary}
-            onFlag={handleCellFlag}
-            onChord={handleCellChord}
-            onClose={() => setSelectedStackCell(null)}
-          />
-        ) : null}
+        <CubeBoard game={game} rotation={rotation} onRotate={setRotation} onCellPrimary={handleCellPrimary} onCellFlag={handleCellFlag} />
       </div>
 
       {game.status === 'won' || game.status === 'lost' ? (
