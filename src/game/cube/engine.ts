@@ -109,25 +109,33 @@ export function toggleCubeFlag(game: CubeGameState, coordinate: CubeCoordinate):
 }
 
 export function chordCubeCell(game: CubeGameState, coordinate: CubeCoordinate): CubeGameState {
-  if (game.status !== 'playing' || coordinate.depth !== 0) {
+  if (!canChordCubeCell(game, coordinate)) {
     return game;
   }
 
   const target = game.board[coordinate.face]?.[0]?.[coordinate.row]?.[coordinate.col];
-  if (!target?.isRevealed || target.surfaceNeighborMines === 0) {
-    return game;
-  }
-
   const neighbors = getSurfaceNeighbors(target, game.preset.size);
-  const flagCount = neighbors.filter((neighbor) => game.board[neighbor.face][0][neighbor.row][neighbor.col].isFlagged).length;
-  if (flagCount !== target.surfaceNeighborMines) {
-    return game;
-  }
 
   return neighbors.reduce((nextGame, neighbor) => {
     const cell = nextGame.board[neighbor.face][0][neighbor.row][neighbor.col];
     return cell.isRevealed || cell.isFlagged ? nextGame : revealCubeCell(nextGame, neighbor);
   }, game);
+}
+
+export function canChordCubeCell(game: CubeGameState, coordinate: CubeCoordinate): boolean {
+  if (game.status !== 'playing' || coordinate.depth !== 0) {
+    return false;
+  }
+
+  const target = game.board[coordinate.face]?.[0]?.[coordinate.row]?.[coordinate.col];
+  if (!target?.isRevealed || target.surfaceNeighborMines === 0) {
+    return false;
+  }
+
+  const neighbors = getSurfaceNeighbors(target, game.preset.size);
+  const flagCount = neighbors.filter((neighbor) => game.board[neighbor.face][0][neighbor.row][neighbor.col].isFlagged).length;
+
+  return flagCount === target.surfaceNeighborMines;
 }
 
 export function cloneCubeBoard(board: CubeBoard): CubeBoard {
@@ -155,11 +163,25 @@ function revealSurfaceSafeCells(board: CubeBoard, start: CubeCoordinate, preset:
     }
 
     board[cell.face][0][cell.row][cell.col] = { ...cell, isRevealed: true };
+    const revealedCell = board[cell.face][0][cell.row][cell.col];
 
-    if (cell.surfaceNeighborMines === 0 && cell.depthMineCount === 0) {
-      getSurfaceNeighbors(cell, preset.size).forEach((neighbor) => queue.push(neighbor));
+    if (revealedCell.depthMineCount === 0) {
+      revealSafeDepthStack(board, revealedCell, preset);
+    }
+
+    if (revealedCell.surfaceNeighborMines === 0 && revealedCell.depthMineCount === 0) {
+      getSurfaceNeighbors(revealedCell, preset.size).forEach((neighbor) => queue.push(neighbor));
     }
   }
+}
+
+function revealSafeDepthStack(board: CubeBoard, surfaceCell: CubeCell, preset: CubePreset): void {
+  getDepthStackCoordinates(surfaceCell, preset.hiddenDepth).forEach((coordinate) => {
+    const cell = board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col];
+    if (!cell.hasMine && !cell.isFlagged) {
+      board[cell.face][cell.depth][cell.row][cell.col] = { ...cell, isRevealed: true };
+    }
+  });
 }
 
 function revealCubeLoss(game: CubeGameState, exploded: CubeCoordinate): CubeGameState {

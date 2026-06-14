@@ -1,4 +1,4 @@
-import { Bomb, Flag, Gauge, RotateCcw, Timer } from 'lucide-react';
+import { Bomb, Flag, Gauge, RotateCcw, Timer, Undo2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { chordCubeCell, createInitialCubeGame, revealCubeCell, toggleCubeFlag } from '../game/cube/engine';
@@ -10,6 +10,11 @@ import DepthStackPopover from './DepthStackPopover';
 const CUBE_BEST_TIMES_KEY = 'minesweeper.cubeBestTimes';
 type CubeBestTimes = Partial<Record<string, number>>;
 
+interface CubeUndoSnapshot {
+  game: CubeGameState;
+  elapsedSeconds: number;
+}
+
 export default function CubeGame() {
   const [preset, setPreset] = useState<CubePreset>(CUBE_PRESETS.starter);
   const [game, setGame] = useState<CubeGameState>(() => createInitialCubeGame(CUBE_PRESETS.starter));
@@ -19,6 +24,7 @@ export default function CubeGame() {
   const [selectedStackCell, setSelectedStackCell] = useState<CubeCell | null>(null);
   const [peekCell, setPeekCell] = useState<CubeCell | null>(null);
   const [bestTimes, setBestTimes] = useState<CubeBestTimes>(() => readCubeBestTimes());
+  const [undoSnapshot, setUndoSnapshot] = useState<CubeUndoSnapshot | null>(null);
 
   useEffect(() => {
     if (game.status !== 'playing') {
@@ -61,6 +67,7 @@ export default function CubeGame() {
     setElapsedSeconds(0);
     setSelectedStackCell(null);
     setPeekCell(null);
+    setUndoSnapshot(null);
   }
 
   function changePreset(value: string) {
@@ -74,21 +81,53 @@ export default function CubeGame() {
       return;
     }
 
-    if (cell.depth === 0 && cell.isRevealed && cell.depthMineCount > 0) {
-      setSelectedStackCell(cell);
+    const previousGame = game;
+    const previousElapsedSeconds = elapsedSeconds;
+
+    if (cell.depth === 0 && cell.isRevealed) {
+      if (cell.depthMineCount > 0) {
+        setSelectedStackCell(cell);
+        return;
+      }
+
+      if (cell.surfaceNeighborMines > 0) {
+        commitCubeGame(chordCubeCell(previousGame, cell), previousGame, previousElapsedSeconds);
+      }
       return;
     }
 
-    if (cell.depth === 0 && cell.isRevealed && cell.surfaceNeighborMines > 0) {
-      setGame(chordCubeCell(game, cell));
-      return;
-    }
-
-    setGame(revealCubeCell(game, cell));
+    commitCubeGame(revealCubeCell(previousGame, cell), previousGame, previousElapsedSeconds);
   }
 
   function handleCellFlag(cell: CubeCell) {
     setGame(toggleCubeFlag(game, cell));
+  }
+
+  function handleCellChord(cell: CubeCell) {
+    commitCubeGame(chordCubeCell(game, cell), game, elapsedSeconds);
+  }
+
+  function commitCubeGame(nextGame: CubeGameState, previousGame: CubeGameState, previousElapsedSeconds: number) {
+    if (previousGame.status !== 'lost' && nextGame.status === 'lost') {
+      setUndoSnapshot({ game: previousGame, elapsedSeconds: previousElapsedSeconds });
+    } else if (nextGame.status !== 'lost') {
+      setUndoSnapshot(null);
+    }
+
+    setGame(nextGame);
+  }
+
+  function undoLastMove() {
+    if (!undoSnapshot) {
+      return;
+    }
+
+    setPreset(undoSnapshot.game.preset);
+    setGame(undoSnapshot.game);
+    setElapsedSeconds(undoSnapshot.elapsedSeconds);
+    setSelectedStackCell(null);
+    setPeekCell(null);
+    setUndoSnapshot(null);
   }
 
   return (
@@ -152,9 +191,34 @@ export default function CubeGame() {
       <div className="cube-play-area">
         <CubeBoard game={game} rotation={rotation} onRotate={setRotation} onCellPrimary={handleCellPrimary} onCellFlag={handleCellFlag} onPeek={setPeekCell} />
         {selectedStackCell ? (
-          <DepthStackPopover game={game} surfaceCell={selectedStackCell} onReveal={handleCellPrimary} onFlag={handleCellFlag} onClose={() => setSelectedStackCell(null)} />
+          <DepthStackPopover
+            game={game}
+            surfaceCell={selectedStackCell}
+            onReveal={handleCellPrimary}
+            onFlag={handleCellFlag}
+            onChord={handleCellChord}
+            onClose={() => setSelectedStackCell(null)}
+          />
         ) : null}
       </div>
+
+      {game.status === 'won' || game.status === 'lost' ? (
+        <div className="result-banner" role="status">
+          <strong>{game.status === 'won' ? 'Cube cleared' : 'Game over'}</strong>
+          <span>{game.status === 'won' ? `Finished in ${elapsedSeconds} seconds.` : 'A mine ended the cube run.'}</span>
+          <div className="result-actions">
+            {game.status === 'lost' && undoSnapshot ? (
+              <button type="button" onClick={undoLastMove} aria-label="Undo last cube move">
+                <Undo2 aria-hidden="true" />
+                Undo
+              </button>
+            ) : null}
+            <button type="button" onClick={() => startNewGame()}>
+              New game
+            </button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

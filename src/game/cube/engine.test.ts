@@ -121,6 +121,16 @@ describe('cube engine actions', () => {
     expect(next.revealedCount).toBeGreaterThan(0);
   });
 
+  it('auto-reveals safe depth cells when a revealed surface has no depth mines', () => {
+    const game = createInitialCubeGame(CUBE_PRESETS.starter);
+    const firstClick = { face: 'front' as const, row: 1, col: 1, depth: 0 };
+    const next = revealCubeCell(game, firstClick, () => 0);
+    const stack = getDepthStackCoordinates(firstClick, CUBE_PRESETS.starter.hiddenDepth).map((coordinate) => cellAt(next, coordinate));
+
+    expect(cellAt(next, firstClick).depthMineCount).toBe(0);
+    expect(stack.every((cell) => cell.isRevealed)).toBe(true);
+  });
+
   it('toggles flags on covered surface and depth cells', () => {
     const game = createInitialCubeGame(CUBE_PRESETS.starter);
     const flaggedSurface = toggleCubeFlag(game, { face: 'front', row: 0, col: 0, depth: 0 });

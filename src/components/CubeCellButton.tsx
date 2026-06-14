@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type { CubeCell } from '../game/cube/types';
 
 interface CubeCellButtonProps {
@@ -8,18 +9,62 @@ interface CubeCellButtonProps {
 }
 
 export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: CubeCellButtonProps) {
+  const touchPeekTimer = useRef<number | null>(null);
+  const suppressNextFocusPeek = useRef(false);
+
+  function clearTouchPeek() {
+    if (touchPeekTimer.current !== null) {
+      window.clearTimeout(touchPeekTimer.current);
+      touchPeekTimer.current = null;
+    }
+
+    onPeek(null);
+  }
+
   return (
     <button
       type="button"
       role="gridcell"
       className={getCubeCellClass(cell)}
-      onClick={() => onPrimary(cell)}
+      onClick={() => {
+        suppressNextFocusPeek.current = false;
+        onPrimary(cell);
+      }}
       onContextMenu={(event) => {
         event.preventDefault();
         onFlag(cell);
       }}
       onMouseEnter={() => onPeek(cell)}
       onMouseLeave={() => onPeek(null)}
+      onFocus={() => {
+        if (!suppressNextFocusPeek.current) {
+          onPeek(cell);
+        }
+      }}
+      onBlur={() => {
+        suppressNextFocusPeek.current = false;
+        onPeek(null);
+      }}
+      onPointerDown={(event) => {
+        suppressNextFocusPeek.current = true;
+
+        if (event.pointerType === 'touch') {
+          touchPeekTimer.current = window.setTimeout(() => {
+            touchPeekTimer.current = null;
+            onPeek(cell);
+          }, 450);
+        }
+      }}
+      onPointerUp={(event) => {
+        if (event.pointerType === 'touch') {
+          clearTouchPeek();
+        }
+      }}
+      onPointerCancel={(event) => {
+        if (event.pointerType === 'touch') {
+          clearTouchPeek();
+        }
+      }}
       aria-label={getCubeCellLabel(cell)}
     >
       {getCubeCellContent(cell)}
