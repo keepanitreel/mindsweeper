@@ -1,7 +1,7 @@
 import { Bomb, Flag, Gauge, RotateCcw, Timer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { createInitialCubeGame, revealCubeCell, toggleCubeFlag } from '../game/cube/engine';
+import { chordCubeCell, createInitialCubeGame, revealCubeCell, toggleCubeFlag } from '../game/cube/engine';
 import { CUBE_PRESETS } from '../game/cube/presets';
 import type { CubeCell, CubeGameState, CubePreset } from '../game/cube/types';
 import CubeBoard, { type CubeRotation } from './CubeBoard';
@@ -45,6 +45,12 @@ export default function CubeGame() {
     });
   }, [elapsedSeconds, game.status, preset.id]);
 
+  useEffect(() => {
+    if (game.status === 'won' || game.status === 'lost') {
+      setSelectedStackCell(null);
+    }
+  }, [game.status]);
+
   const remainingMines = Math.max(0, game.preset.mines - game.flaggedCount);
   const statusText = game.status === 'ready' ? 'Ready' : game.status === 'playing' ? 'Playing' : game.status === 'won' ? 'You won' : 'Mine hit';
   const bestTime = bestTimes[preset.id];
@@ -70,6 +76,11 @@ export default function CubeGame() {
 
     if (cell.depth === 0 && cell.isRevealed && cell.depthMineCount > 0) {
       setSelectedStackCell(cell);
+      return;
+    }
+
+    if (cell.depth === 0 && cell.isRevealed && cell.surfaceNeighborMines > 0) {
+      setGame(chordCubeCell(game, cell));
       return;
     }
 

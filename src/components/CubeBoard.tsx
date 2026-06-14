@@ -27,6 +27,10 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   } as CSSProperties;
 
   function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.target instanceof Element && event.target.closest('button')) {
+      return;
+    }
+
     dragStart.current = { x: event.clientX, y: event.clientY, rotation };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }

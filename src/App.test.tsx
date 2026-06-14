@@ -1,7 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+import { createInitialCubeGame, revealCubeCell } from './game/cube/engine';
+import { getDepthStackCoordinates, getSurfaceNeighbors } from './game/cube/geometry';
+import { CUBE_PRESETS } from './game/cube/presets';
+import type { CubeCell, CubeCoordinate, CubeGameState } from './game/cube/types';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -114,4 +118,140 @@ describe('Minesweeper app', () => {
 
     expect(screen.getByRole('gridcell', { name: /flagged cube cell/i })).toBeInTheDocument();
   });
+
+  it('does not start cube drag capture from cube cell buttons', async () => {
+    const user = userEvent.setup();
+    const setPointerCapture = vi.fn();
+    const elementPrototype = Element.prototype as Partial<Pick<Element, 'setPointerCapture'>>;
+    const originalSetPointerCapture = elementPrototype.setPointerCapture;
+    elementPrototype.setPointerCapture = setPointerCapture;
+
+    try {
+      render(<App />);
+
+      await user.click(screen.getByRole('button', { name: /cube mode/i }));
+      const cell = screen.getByRole('gridcell', { name: /covered cube cell front row 2 column 2 surface/i });
+
+      await user.pointer([{ keys: '[MouseLeft>]', target: cell }]);
+
+      expect(setPointerCapture).not.toHaveBeenCalled();
+
+      await user.pointer([{ keys: '[/MouseLeft]', target: cell }]);
+      await user.click(cell);
+
+      expect(screen.getByText('Playing')).toBeInTheDocument();
+    } finally {
+      if (originalSetPointerCapture) {
+        elementPrototype.setPointerCapture = originalSetPointerCapture;
+      } else {
+        delete elementPrototype.setPointerCapture;
+      }
+    }
+  });
+
+  it('chords revealed Cube Mode surface numbers when matching surface mines are flagged', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const chordTarget = findChordTarget(modeledGame);
+    const surfaceMines = getSurfaceNeighbors(chordTarget, modeledGame.preset.size)
+      .map((coordinate) => modeledGame.board[coordinate.face][0][coordinate.row][coordinate.col])
+      .filter((cell) => cell.hasMine);
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+    await user.click(screen.getByRole('button', { name: /flag mode/i }));
+    for (const mine of surfaceMines) {
+      await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(mine) }));
+    }
+    await user.click(screen.getByRole('button', { name: /flag mode/i }));
+
+    const revealedBefore = screen.getAllByRole('gridcell', { name: /revealed cube cell/i }).length;
+    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(chordTarget) }));
+
+    expect(screen.getAllByRole('gridcell', { name: /revealed cube cell/i }).length).toBeGreaterThan(revealedBefore);
+  });
+
+  it('closes the Cube Mode depth stack after a terminal mine hit', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const stackSurface = findDepthStackSurface(modeledGame);
+    const stackMine = getDepthStackCoordinates(stackSurface, modeledGame.preset.hiddenDepth)
+      .map((coordinate) => modeledGame.board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col])
+      .find((cell) => cell.hasMine)!;
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(stackSurface) }));
+
+    expect(screen.getByLabelText(getDepthStackLabel(stackSurface))).toBeInTheDocument();
+
+    await user.click(screen.getByRole('gridcell', { name: getCubeCellLabel(stackMine) }));
+
+    expect(screen.getByText('Mine hit')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByLabelText(getDepthStackLabel(stackSurface))).not.toBeInTheDocument());
+  });
 });
+
+const cubeTestRandom = 0.05;
+const firstCubeClick: CubeCoordinate = { face: 'front', row: 1, col: 1, depth: 0 };
+
+function createModeledCubeGameAfterFirstClick(): CubeGameState {
+  return revealCubeCell(createInitialCubeGame(CUBE_PRESETS.starter), firstCubeClick, () => cubeTestRandom);
+}
+
+function findChordTarget(game: CubeGameState): CubeCell {
+  const target = getSurfaceCells(game).find((cell) => cell.isRevealed && cell.surfaceNeighborMines > 0 && cell.depthMineCount === 0);
+
+  expect(target).toBeDefined();
+  return target!;
+}
+
+function findDepthStackSurface(game: CubeGameState): CubeCell {
+  const target = getSurfaceCells(game).find(
+    (cell) =>
+      cell.isRevealed &&
+      cell.depthMineCount > 0 &&
+      getDepthStackCoordinates(cell, game.preset.hiddenDepth).some((coordinate) => game.board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col].hasMine),
+  );
+
+  expect(target).toBeDefined();
+  return target!;
+}
+
+function getSurfaceCells(game: CubeGameState): CubeCell[] {
+  return Object.values(game.board).flatMap((layers) => layers[0].flat());
+}
+
+function getCubeCellLabel(cell: CubeCell): string {
+  const layer = cell.depth === 0 ? 'surface' : `depth ${cell.depth}`;
+  const base = `cube cell ${cell.face} row ${cell.row + 1} column ${cell.col + 1} ${layer}`;
+
+  if (cell.isFlagged) {
+    return `Flagged ${base}`;
+  }
+
+  if (!cell.isRevealed) {
+    return `Covered ${base}`;
+  }
+
+  if (cell.hasMine) {
+    return `Mine ${base}`;
+  }
+
+  return `Revealed ${base} with ${cell.surfaceNeighborMines} surface mines and ${cell.depthMineCount} depth mines`;
+}
+
+function getCoveredCubeCoordinateLabel(coordinate: CubeCoordinate): string {
+  const layer = coordinate.depth === 0 ? 'surface' : `depth ${coordinate.depth}`;
+  return `Covered cube cell ${coordinate.face} row ${coordinate.row + 1} column ${coordinate.col + 1} ${layer}`;
+}
+
+function getDepthStackLabel(surfaceCell: CubeCell): string {
+  return `Depth stack for ${surfaceCell.face} row ${surfaceCell.row + 1} column ${surfaceCell.col + 1}`;
+}
