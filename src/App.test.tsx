@@ -105,6 +105,31 @@ describe('Minesweeper app', () => {
     expect(screen.getAllByRole('gridcell', { name: /covered cube cell/i }).length).toBeGreaterThan(0);
   });
 
+  it('rotates Cube Mode with keyboard arrow keys', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+
+    const cubeStage = document.querySelector<HTMLElement>('.cube-stage');
+
+    expect(cubeStage).toBeInTheDocument();
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('-24deg');
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-32deg');
+
+    await user.keyboard('{ArrowLeft}');
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-122deg');
+
+    await user.keyboard('{ArrowRight}');
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-32deg');
+
+    await user.keyboard('{ArrowUp}');
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('66deg');
+
+    await user.keyboard('{ArrowDown}');
+    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('-24deg');
+  });
+
   it('reveals and flags Cube Mode cells', async () => {
     const user = userEvent.setup();
     render(<App />);

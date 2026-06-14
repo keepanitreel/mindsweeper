@@ -9,6 +9,7 @@ import DepthStackPopover from './DepthStackPopover';
 
 const CUBE_BEST_TIMES_KEY = 'minesweeper.cubeBestTimes';
 type CubeBestTimes = Partial<Record<string, number>>;
+type CubeRotationDirection = 'left' | 'right' | 'up' | 'down';
 
 interface CubeUndoSnapshot {
   game: CubeGameState;
@@ -56,6 +57,22 @@ export default function CubeGame() {
       setSelectedStackCell(null);
     }
   }, [game.status]);
+
+  useEffect(() => {
+    function handleCubeKeyboardRotation(event: KeyboardEvent) {
+      const direction = getCubeRotationDirection(event.key);
+
+      if (!direction || isKeyboardInputTarget(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      setRotation((value) => rotateCube(value, direction));
+    }
+
+    window.addEventListener('keydown', handleCubeKeyboardRotation);
+    return () => window.removeEventListener('keydown', handleCubeKeyboardRotation);
+  }, []);
 
   const remainingMines = Math.max(0, game.preset.mines - game.flaggedCount);
   const statusText = game.status === 'ready' ? 'Ready' : game.status === 'playing' ? 'Playing' : game.status === 'won' ? 'You won' : 'Mine hit';
@@ -155,16 +172,16 @@ export default function CubeGame() {
         </label>
 
         <div className="cube-rotate-controls" aria-label="Cube rotation controls">
-          <button type="button" onClick={() => setRotation((value) => ({ ...value, y: value.y - 90 }))} aria-label="Rotate left">
+          <button type="button" onClick={() => setRotation((value) => rotateCube(value, 'left'))} aria-label="Rotate left">
             Left
           </button>
-          <button type="button" onClick={() => setRotation((value) => ({ ...value, y: value.y + 90 }))} aria-label="Rotate right">
+          <button type="button" onClick={() => setRotation((value) => rotateCube(value, 'right'))} aria-label="Rotate right">
             Right
           </button>
-          <button type="button" onClick={() => setRotation((value) => ({ ...value, x: value.x + 90 }))} aria-label="Rotate up">
+          <button type="button" onClick={() => setRotation((value) => rotateCube(value, 'up'))} aria-label="Rotate up">
             Up
           </button>
-          <button type="button" onClick={() => setRotation((value) => ({ ...value, x: value.x - 90 }))} aria-label="Rotate down">
+          <button type="button" onClick={() => setRotation((value) => rotateCube(value, 'down'))} aria-label="Rotate down">
             Down
           </button>
         </div>
@@ -235,6 +252,43 @@ function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: s
 
 function formatCounter(value: number): string {
   return String(Math.max(0, Math.min(999, value))).padStart(3, '0');
+}
+
+function getCubeRotationDirection(key: string): CubeRotationDirection | null {
+  if (key === 'ArrowLeft') {
+    return 'left';
+  }
+  if (key === 'ArrowRight') {
+    return 'right';
+  }
+  if (key === 'ArrowUp') {
+    return 'up';
+  }
+  if (key === 'ArrowDown') {
+    return 'down';
+  }
+  return null;
+}
+
+function rotateCube(rotation: CubeRotation, direction: CubeRotationDirection): CubeRotation {
+  if (direction === 'left') {
+    return { ...rotation, y: rotation.y - 90 };
+  }
+  if (direction === 'right') {
+    return { ...rotation, y: rotation.y + 90 };
+  }
+  if (direction === 'up') {
+    return { ...rotation, x: rotation.x + 90 };
+  }
+  return { ...rotation, x: rotation.x - 90 };
+}
+
+function isKeyboardInputTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  return target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
 }
 
 function readCubeBestTimes(): CubeBestTimes {
