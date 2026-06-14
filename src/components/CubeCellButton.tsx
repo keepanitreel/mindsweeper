@@ -11,6 +11,8 @@ interface CubeCellButtonProps {
 export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: CubeCellButtonProps) {
   const touchPeekTimer = useRef<number | null>(null);
   const suppressNextFocusPeek = useRef(false);
+  const suppressNextTouchClick = useRef(false);
+  const suppressNextTouchContextMenu = useRef(false);
 
   function clearTouchPeek() {
     if (touchPeekTimer.current !== null) {
@@ -27,11 +29,22 @@ export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: Cube
       role="gridcell"
       className={getCubeCellClass(cell)}
       onClick={() => {
+        if (suppressNextTouchClick.current) {
+          suppressNextTouchClick.current = false;
+          suppressNextFocusPeek.current = false;
+          return;
+        }
+
         suppressNextFocusPeek.current = false;
         onPrimary(cell);
       }}
       onContextMenu={(event) => {
         event.preventDefault();
+        if (suppressNextTouchContextMenu.current) {
+          suppressNextTouchContextMenu.current = false;
+          return;
+        }
+
         onFlag(cell);
       }}
       onMouseEnter={() => onPeek(cell)}
@@ -49,8 +62,12 @@ export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: Cube
         suppressNextFocusPeek.current = true;
 
         if (event.pointerType === 'touch') {
+          suppressNextTouchClick.current = false;
+          suppressNextTouchContextMenu.current = false;
           touchPeekTimer.current = window.setTimeout(() => {
             touchPeekTimer.current = null;
+            suppressNextTouchClick.current = true;
+            suppressNextTouchContextMenu.current = true;
             onPeek(cell);
           }, 450);
         }

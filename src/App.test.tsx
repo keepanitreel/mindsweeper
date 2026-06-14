@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -9,6 +9,7 @@ import type { CubeCell, CubeCoordinate, CubeGameState } from './game/cube/types'
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('Minesweeper app', () => {
@@ -271,6 +272,60 @@ describe('Minesweeper app', () => {
 
     expect(screen.queryByText(`Depth ${peekTarget.depthMineCount}`)).not.toBeInTheDocument();
   });
+
+  it('does not reveal a Cube Mode cell after touch press-and-hold depth peek', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+
+    vi.useFakeTimers();
+    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
+    dispatchTouchPointerEvent(peekButton, 'pointerdown');
+    act(() => {
+      vi.advanceTimersByTime(451);
+    });
+
+    expect(screen.getByText(`Depth ${peekTarget.depthMineCount}`)).toBeInTheDocument();
+
+    dispatchTouchPointerEvent(peekButton, 'pointerup');
+    fireEvent.click(peekButton);
+
+    expect(screen.queryByText(`Depth ${peekTarget.depthMineCount}`)).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
+  });
+
+  it('does not flag a Cube Mode cell after touch press-and-hold depth peek context menu', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+
+    vi.useFakeTimers();
+    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
+    dispatchTouchPointerEvent(peekButton, 'pointerdown');
+    act(() => {
+      vi.advanceTimersByTime(451);
+    });
+
+    expect(screen.getByText(`Depth ${peekTarget.depthMineCount}`)).toBeInTheDocument();
+
+    fireEvent.contextMenu(peekButton);
+    dispatchTouchPointerEvent(peekButton, 'pointerup');
+
+    expect(screen.queryByRole('gridcell', { name: /flagged cube cell/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
+  });
 });
 
 const cubeTestRandom = 0.05;
@@ -301,6 +356,13 @@ function findDepthStackSurface(game: CubeGameState): CubeCell {
 
 function findSplitChordTarget(game: CubeGameState): CubeCell {
   const target = getSurfaceCells(game).find((cell) => cell.isRevealed && cell.surfaceNeighborMines > 0 && cell.depthMineCount > 0);
+
+  expect(target).toBeDefined();
+  return target!;
+}
+
+function findCoveredDepthPeekTarget(game: CubeGameState): CubeCell {
+  const target = getSurfaceCells(game).find((cell) => !cell.isRevealed && cell.depthMineCount > 0);
 
   expect(target).toBeDefined();
   return target!;
@@ -341,4 +403,11 @@ function getMineCubeCoordinateLabel(coordinate: CubeCoordinate): string {
 
 function getDepthStackLabel(surfaceCell: CubeCell): string {
   return `Depth stack for ${surfaceCell.face} row ${surfaceCell.row + 1} column ${surfaceCell.col + 1}`;
+}
+
+function dispatchTouchPointerEvent(target: Element, type: 'pointerdown' | 'pointerup') {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  Object.defineProperty(event, 'pointerType', { value: 'touch' });
+  fireEvent(target, event);
 }
