@@ -105,6 +105,26 @@ describe('Minesweeper app', () => {
     expect(screen.getAllByRole('gridcell', { name: /covered cube cell/i }).length).toBeGreaterThan(0);
   });
 
+  it('renders the expanded Standard and Deep cube presets', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+
+    const cubeStage = document.querySelector<HTMLElement>('.cube-stage');
+    expect(cubeStage).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Cube difficulty'), 'standard');
+    expect(cubeStage!.style.getPropertyValue('--cube-size')).toBe('10');
+    expect(cubeStage!.style.getPropertyValue('--cube-cell-size')).toBe('clamp(24px, calc((100vw - 160px) / 10), 54px)');
+    expect(screen.getByText('200')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Cube difficulty'), 'deep');
+    expect(cubeStage!.style.getPropertyValue('--cube-size')).toBe('20');
+    expect(cubeStage!.style.getPropertyValue('--cube-cell-size')).toBe('clamp(16px, calc((100vw - 160px) / 20), 32px)');
+    expect(screen.getByText('1280')).toBeInTheDocument();
+  });
+
   it('rotates Cube Mode with keyboard arrow keys', async () => {
     const user = userEvent.setup();
     render(<App />);

@@ -4,8 +4,8 @@ import { CUBE_PRESETS, validateCubePreset } from './presets';
 describe('cube presets', () => {
   it('defines the fixed Cube Mode presets from the design', () => {
     expect(CUBE_PRESETS.starter).toMatchObject({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 2, mines: 24 });
-    expect(CUBE_PRESETS.standard).toMatchObject({ id: 'standard', label: 'Standard Cube', size: 5, hiddenDepth: 2, mines: 50 });
-    expect(CUBE_PRESETS.deep).toMatchObject({ id: 'deep', label: 'Deep Cube', size: 5, hiddenDepth: 3, mines: 80 });
+    expect(CUBE_PRESETS.standard).toMatchObject({ id: 'standard', label: 'Standard Cube', size: 10, hiddenDepth: 2, mines: 200 });
+    expect(CUBE_PRESETS.deep).toMatchObject({ id: 'deep', label: 'Deep Cube', size: 20, hiddenDepth: 3, mines: 1280 });
   });
 
   it('accepts all fixed Cube Mode presets', () => {
