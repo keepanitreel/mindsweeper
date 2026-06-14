@@ -34,6 +34,26 @@ test('renders usable mobile layout', async ({ page }) => {
   await expect(page.getByRole('grid')).toBeVisible();
 });
 
+test('makes the classic playing field the dominant desktop region', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+
+  const boardRegion = page.locator('.board-wrap');
+  const boardBox = await boardRegion.boundingBox();
+  const controlBox = await page.locator('.control-strip').boundingBox();
+  const hudBox = await page.locator('.hud').boundingBox();
+  const subHudBox = await page.locator('.sub-hud').boundingBox();
+
+  expect(boardBox).not.toBeNull();
+  expect(controlBox).not.toBeNull();
+  expect(hudBox).not.toBeNull();
+  expect(subHudBox).not.toBeNull();
+
+  const chromeHeight = controlBox!.height + hudBox!.height + subHudBox!.height;
+  expect(boardBox!.height).toBeGreaterThan(720 * 0.64);
+  expect(boardBox!.height).toBeGreaterThan(chromeHeight * 2);
+});
+
 test('undoes the move that hit a mine', async ({ page }) => {
   await page.addInitScript(() => {
     Math.random = () => 0;
@@ -94,4 +114,37 @@ test('keeps Cube Mode surface-only during play', async ({ page }) => {
   await expect(page.getByText(/^Depth /i)).toHaveCount(0);
   await expect(page.getByLabel(/depth stack/i)).toHaveCount(0);
   await expect(page.getByRole('gridcell', { name: /depth mines/i })).toHaveCount(0);
+});
+
+test('clicks the intended Cube Mode square near a projected face edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /cube mode/i }).click();
+  await page.getByRole('button', { name: /flag mode/i }).click();
+
+  const targetCell = page.getByRole('gridcell', { name: /covered cube cell top row 4 column 2 surface/i });
+  const point = await targetCell.evaluate((element) => {
+    const marker = document.createElement('span');
+    marker.style.position = 'absolute';
+    marker.style.left = '80%';
+    marker.style.top = '20%';
+    marker.style.width = '1px';
+    marker.style.height = '1px';
+    marker.style.pointerEvents = 'none';
+    marker.style.opacity = '0';
+    element.append(marker);
+
+    const rect = marker.getBoundingClientRect();
+    marker.remove();
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  });
+
+  await page.mouse.click(point.x, point.y);
+
+  await expect(page.getByRole('gridcell', { name: /flagged cube cell top row 4 column 2 surface/i })).toBeVisible();
 });

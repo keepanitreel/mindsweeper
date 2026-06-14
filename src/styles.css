@@ -32,8 +32,8 @@ input {
 }
 
 .app-shell {
-  min-height: 100vh;
-  padding: 22px;
+  min-height: 100dvh;
+  padding: clamp(10px, 1.4vw, 18px);
   display: grid;
   place-items: center;
   background:
@@ -42,28 +42,30 @@ input {
 }
 
 .mode-shell {
-  width: min(100%, 1120px);
+  width: min(100%, 1240px);
 }
 
 .mode-switch {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 12px;
+  justify-content: center;
+  margin: 0 0 8px;
   flex-wrap: wrap;
 }
 
 .mode-switch button {
-  min-height: 42px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   border: 1px solid rgba(210, 255, 183, 0.22);
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   color: #d7efc9;
   background: #071a12;
   cursor: pointer;
+  font-size: 0.84rem;
   font-weight: 800;
 }
 
@@ -73,17 +75,31 @@ input {
 }
 
 .mode-switch svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .game-panel {
-  width: min(100%, 1120px);
-  padding: 18px;
+  width: 100%;
+  min-height: calc(100dvh - 72px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-auto-rows: max-content;
+  gap: 8px;
+  padding: clamp(10px, 1.2vw, 14px);
   border: 1px solid rgba(210, 255, 183, 0.22);
   border-radius: 8px;
   background: var(--panel);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38);
+}
+
+.game-header,
+.control-strip,
+.error-message,
+.board-wrap,
+.cube-play-area,
+.result-banner {
+  grid-column: 1 / -1;
 }
 
 .game-header,
@@ -98,9 +114,9 @@ input {
 }
 
 .eyebrow {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: var(--accent-strong);
-  font-size: 0.77rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -108,8 +124,8 @@ input {
 
 h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 4.5rem);
-  line-height: 0.92;
+  font-size: clamp(1.35rem, 2.5vw, 2.15rem);
+  line-height: 0.96;
 }
 
 .icon-button,
@@ -126,8 +142,8 @@ h1 {
 }
 
 .icon-button {
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   display: inline-grid;
   place-items: center;
 }
@@ -137,13 +153,13 @@ h1 {
 .stat svg,
 .best-time svg,
 .result-actions svg {
-  width: 19px;
-  height: 19px;
+  width: 16px;
+  height: 16px;
 }
 
 .control-strip {
-  margin-top: 18px;
-  padding: 12px;
+  margin-top: 0;
+  padding: 6px 8px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
 }
@@ -152,9 +168,9 @@ h1 {
 .mini-field {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #cde9bc;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -164,46 +180,47 @@ input {
   background: #eef7df;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 6px;
-  min-height: 38px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 8px;
 }
 
 .custom-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .mini-field input {
-  width: 72px;
+  width: 62px;
 }
 
 .small-button {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .error-message {
   color: #ffd0c8;
-  margin: 10px 4px 0;
+  margin: 0 4px;
   font-weight: 700;
 }
 
 .hud {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .stat,
 .status-pill,
 .best-time,
 .flag-toggle {
-  min-height: 44px;
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 6px 10px;
   border-radius: 8px;
+  font-size: 0.84rem;
 }
 
 .stat,
@@ -215,14 +232,14 @@ input {
 .stat strong {
   font-variant-numeric: tabular-nums;
   color: #ffffff;
-  font-size: 1.35rem;
+  font-size: 1.08rem;
 }
 
 .status-pill {
   background: #1b5837;
   color: #f4ffe8;
   font-weight: 900;
-  min-width: 112px;
+  min-width: 90px;
   justify-content: center;
 }
 
@@ -236,7 +253,8 @@ input {
 }
 
 .sub-hud {
-  margin-top: 12px;
+  margin-top: 0;
+  justify-content: flex-end;
 }
 
 .flag-toggle.active {
@@ -244,15 +262,19 @@ input {
 }
 
 .board-wrap {
-  margin-top: 18px;
+  min-height: 65dvh;
+  margin-top: 0;
   overflow: auto;
   padding: 8px;
   background: #071a12;
   border-radius: 8px;
+  display: grid;
+  place-items: center;
+  align-self: stretch;
 }
 
 .board {
-  --cell-size: clamp(28px, calc((100vw - 92px) / var(--columns)), 42px);
+  --cell-size: clamp(28px, min(calc((100vw - 86px) / var(--columns)), calc((100dvh - 255px) / var(--rows))), 58px);
   display: grid;
   grid-template-columns: repeat(var(--columns), var(--cell-size));
   grid-auto-rows: var(--cell-size);
@@ -332,8 +354,8 @@ input {
 }
 
 .result-banner button {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .result-actions {
@@ -355,7 +377,18 @@ input {
   }
 
   .game-panel {
+    grid-template-columns: 1fr;
     padding: 12px;
+  }
+
+  .hud,
+  .sub-hud {
+    grid-column: 1;
+  }
+
+  .mode-switch button {
+    min-height: 32px;
+    padding: 0 8px;
   }
 
   .control-strip,
@@ -371,6 +404,15 @@ input {
     flex: 1 1 120px;
     justify-content: center;
   }
+
+  .board-wrap {
+    min-height: 52dvh;
+    padding: 6px;
+  }
+
+  .board {
+    --cell-size: clamp(28px, min(calc((100vw - 70px) / var(--columns)), calc((100dvh - 240px) / var(--rows))), 54px);
+  }
 }
 
 .cube-game-panel {
@@ -380,18 +422,19 @@ input {
 .cube-rotate-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .cube-rotate-controls button {
-  min-height: 38px;
+  min-height: 32px;
   border: 0;
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 0 10px;
   color: #102116;
   background: var(--accent-strong);
   cursor: pointer;
+  font-size: 0.82rem;
   font-weight: 800;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
 }
@@ -408,8 +451,8 @@ input {
   --cube-grid-gap: 2px;
   --cube-face-padding: 6px;
   position: relative;
-  min-height: 560px;
-  margin-top: 18px;
+  min-height: min(72dvh, 680px);
+  margin-top: 0;
   display: grid;
   place-items: center;
   background: #071a12;
@@ -432,6 +475,10 @@ input {
 
 .cube-stage:active {
   cursor: grabbing;
+}
+
+.cube-stage-picking .cube-cell {
+  pointer-events: none;
 }
 
 .cube {
@@ -556,6 +603,6 @@ input {
 @media (max-width: 720px) {
   .cube-play-area {
     --cube-cell-size: clamp(28px, calc((100vw - 110px) / 7), 42px);
-    min-height: 430px;
+    min-height: 52dvh;
   }
 }
