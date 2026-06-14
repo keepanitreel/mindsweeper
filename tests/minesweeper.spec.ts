@@ -52,3 +52,45 @@ test('undoes the move that hit a mine', async ({ page }) => {
   await expect(page.getByText('Game over')).toBeHidden();
   await expect(page.getByRole('gridcell', { name: /covered cell row 1 column 2/i })).toBeVisible();
 });
+
+test('selects Cube Mode and performs a basic cube interaction', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /cube mode/i }).click();
+
+  await expect(page.getByRole('heading', { name: 'Cube Mode' })).toBeVisible();
+  await expect(page.getByLabel('Cube difficulty')).toHaveValue('starter');
+  await expect(page.getByRole('button', { name: /rotate left/i })).toBeVisible();
+
+  await page.getByRole('button', { name: /rotate left/i }).click();
+  await page.getByRole('gridcell', { name: /covered cube cell right row 2 column 2 surface/i }).click();
+
+  await expect(page.getByText('Playing')).toBeVisible();
+
+  await page.getByRole('button', { name: /flag mode/i }).click();
+  await page.getByRole('button', { name: /rotate right/i }).click();
+  await page.getByRole('gridcell', { name: /covered cube cell front row 3 column 1 surface/i }).click();
+
+  await expect(page.getByRole('gridcell', { name: /flagged cube cell/i }).first()).toBeVisible();
+});
+
+test('opens a Cube Mode depth stack after revealing a depth-marked surface cell', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /cube mode/i }).click();
+  await page.getByRole('gridcell', { name: /covered cube cell front row 2 column 2 surface/i }).click();
+
+  const revealedDepthCell = page
+    .getByRole('gridcell', { name: /revealed cube cell .* depth mines/i })
+    .filter({ hasText: /[1-3]/ })
+    .first();
+  await revealedDepthCell.click();
+
+  await expect(page.getByLabel(/depth stack for/i)).toBeVisible();
+});
