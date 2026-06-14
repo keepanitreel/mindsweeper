@@ -251,7 +251,7 @@ function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: s
 }
 
 function formatCounter(value: number): string {
-  return String(Math.max(0, Math.min(999, value))).padStart(3, '0');
+  return String(Math.max(0, value)).padStart(3, '0');
 }
 
 function getCubeRotationDirection(key: string): CubeRotationDirection | null {

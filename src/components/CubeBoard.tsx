@@ -22,6 +22,7 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   const dragStart = useRef<{ x: number; y: number; rotation: CubeRotation } | null>(null);
   const boardStyle = {
     '--cube-size': game.preset.size,
+    '--cube-cell-size': getCubeCellSize(game.preset.size),
     '--cube-rotate-x': `${rotation.x}deg`,
     '--cube-rotate-y': `${rotation.y}deg`,
   } as CSSProperties;
@@ -72,4 +73,16 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
       </div>
     </div>
   );
+}
+
+function getCubeCellSize(cubeSize: number): string {
+  if (cubeSize >= 16) {
+    return `clamp(16px, calc((100vw - 160px) / ${cubeSize}), 32px)`;
+  }
+
+  if (cubeSize >= 10) {
+    return `clamp(24px, calc((100vw - 160px) / ${cubeSize}), 54px)`;
+  }
+
+  return `clamp(34px, calc((100vw - 160px) / ${cubeSize}), 54px)`;
 }
