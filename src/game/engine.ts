@@ -85,8 +85,157 @@ export function armBoard(game: GameState, firstClick: Coordinate, random: Random
   };
 }
 
+export function revealCell(game: GameState, coordinate: Coordinate, random: RandomSource = Math.random): GameState {
+  if (game.status === 'won' || game.status === 'lost') {
+    return game;
+  }
+
+  const armed = game.isArmed ? game : armBoard(game, coordinate, random);
+  const target = armed.board[coordinate.row]?.[coordinate.col];
+
+  if (!target || target.isFlagged || target.isRevealed) {
+    return armed;
+  }
+
+  if (target.hasMine) {
+    return revealLoss(armed, coordinate);
+  }
+
+  const board = cloneBoard(armed.board);
+  revealSafeCells(board, coordinate, armed.difficulty.width, armed.difficulty.height);
+  const revealedCount = countRevealed(board);
+  const status = revealedCount === armed.difficulty.width * armed.difficulty.height - armed.difficulty.mines ? 'won' : 'playing';
+
+  return {
+    ...armed,
+    board,
+    status,
+    revealedCount,
+    flaggedCount: countFlags(board),
+  };
+}
+
+export function toggleFlag(game: GameState, coordinate: Coordinate): GameState {
+  if (game.status === 'won' || game.status === 'lost') {
+    return game;
+  }
+
+  const target = game.board[coordinate.row]?.[coordinate.col];
+  if (!target || target.isRevealed) {
+    return game;
+  }
+
+  const board = cloneBoard(game.board);
+  board[coordinate.row][coordinate.col] = {
+    ...board[coordinate.row][coordinate.col],
+    isFlagged: !board[coordinate.row][coordinate.col].isFlagged,
+  };
+
+  return {
+    ...game,
+    board,
+    flaggedCount: countFlags(board),
+  };
+}
+
+export function chordCell(game: GameState, coordinate: Coordinate): GameState {
+  if (game.status !== 'playing') {
+    return game;
+  }
+
+  const target = game.board[coordinate.row]?.[coordinate.col];
+  if (!target?.isRevealed || target.neighborMines === 0) {
+    return game;
+  }
+
+  const neighbors = getNeighborCoordinates(coordinate.row, coordinate.col, game.difficulty.width, game.difficulty.height);
+  const flagCount = neighbors.filter((neighbor) => game.board[neighbor.row][neighbor.col].isFlagged).length;
+  if (flagCount !== target.neighborMines) {
+    return game;
+  }
+
+  return neighbors.reduce((nextGame, neighbor) => {
+    if (nextGame.status === 'lost') {
+      return nextGame;
+    }
+
+    const cell = nextGame.board[neighbor.row][neighbor.col];
+    if (cell.isRevealed || cell.isFlagged) {
+      return nextGame;
+    }
+
+    return revealCell(nextGame, neighbor);
+  }, game);
+}
+
 export function cloneBoard(board: Board): Board {
   return board.map((row) => row.map((cell) => ({ ...cell })));
+}
+
+function revealSafeCells(board: Board, start: Coordinate, width: number, height: number): number {
+  const queue = [start];
+  const visited = new Set<string>();
+  let revealed = 0;
+
+  while (queue.length > 0) {
+    const coordinate = queue.shift()!;
+    const key = coordinateKey(coordinate);
+    if (visited.has(key)) {
+      continue;
+    }
+
+    visited.add(key);
+    const cell = board[coordinate.row][coordinate.col];
+    if (cell.isRevealed || cell.isFlagged || cell.hasMine) {
+      continue;
+    }
+
+    board[coordinate.row][coordinate.col] = { ...cell, isRevealed: true };
+    revealed += 1;
+
+    if (cell.neighborMines === 0) {
+      getNeighborCoordinates(cell.row, cell.col, width, height).forEach((neighbor) => queue.push(neighbor));
+    }
+  }
+
+  return revealed;
+}
+
+function revealLoss(game: GameState, exploded: Coordinate): GameState {
+  const board = cloneBoard(game.board);
+
+  board.forEach((row) => {
+    row.forEach((cell) => {
+      if (cell.hasMine) {
+        board[cell.row][cell.col] = {
+          ...cell,
+          isRevealed: true,
+          isExploded: cell.row === exploded.row && cell.col === exploded.col,
+        };
+      } else if (cell.isFlagged) {
+        board[cell.row][cell.col] = {
+          ...cell,
+          isIncorrectFlag: true,
+        };
+      }
+    });
+  });
+
+  return {
+    ...game,
+    board,
+    status: 'lost',
+    revealedCount: countRevealed(board),
+    flaggedCount: countFlags(board),
+  };
+}
+
+function countRevealed(board: Board): number {
+  return board.flat().filter((cell) => cell.isRevealed && !cell.hasMine).length;
+}
+
+function countFlags(board: Board): number {
+  return board.flat().filter((cell) => cell.isFlagged).length;
 }
 
 function shuffle<T>(items: T[], random: RandomSource): T[] {
