@@ -326,6 +326,58 @@ describe('Minesweeper app', () => {
     expect(screen.queryByRole('gridcell', { name: /flagged cube cell/i })).not.toBeInTheDocument();
     expect(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
   });
+
+  it('allows a normal Cube Mode click after a touch peek context menu is suppressed', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const peekTarget = findCoveredSafeDepthPeekTarget(modeledGame);
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+
+    vi.useFakeTimers();
+    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
+    dispatchTouchPointerEvent(peekButton, 'pointerdown');
+    act(() => {
+      vi.advanceTimersByTime(451);
+    });
+    dispatchTouchPointerEvent(peekButton, 'pointerup');
+    fireEvent.contextMenu(peekButton);
+
+    vi.useRealTimers();
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) }));
+
+    expect(screen.getByRole('gridcell', { name: getRevealedCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
+  });
+
+  it('allows a normal Cube Mode context menu after a touch peek click is suppressed', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(cubeTestRandom);
+    const user = userEvent.setup();
+    const modeledGame = createModeledCubeGameAfterFirstClick();
+    const peekTarget = findCoveredDepthPeekTarget(modeledGame);
+
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(firstCubeClick) }));
+
+    vi.useFakeTimers();
+    const peekButton = screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) });
+    dispatchTouchPointerEvent(peekButton, 'pointerdown');
+    act(() => {
+      vi.advanceTimersByTime(451);
+    });
+    dispatchTouchPointerEvent(peekButton, 'pointerup');
+    fireEvent.click(peekButton);
+
+    vi.useRealTimers();
+    fireEvent.contextMenu(screen.getByRole('gridcell', { name: getCoveredCubeCoordinateLabel(peekTarget) }));
+
+    expect(screen.getByRole('gridcell', { name: getFlaggedCubeCoordinateLabel(peekTarget) })).toBeInTheDocument();
+  });
 });
 
 const cubeTestRandom = 0.05;
@@ -368,6 +420,13 @@ function findCoveredDepthPeekTarget(game: CubeGameState): CubeCell {
   return target!;
 }
 
+function findCoveredSafeDepthPeekTarget(game: CubeGameState): CubeCell {
+  const target = getSurfaceCells(game).find((cell) => !cell.isRevealed && !cell.hasMine && cell.depthMineCount > 0);
+
+  expect(target).toBeDefined();
+  return target!;
+}
+
 function getSurfaceCells(game: CubeGameState): CubeCell[] {
   return Object.values(game.board).flatMap((layers) => layers[0].flat());
 }
@@ -399,6 +458,16 @@ function getCoveredCubeCoordinateLabel(coordinate: CubeCoordinate): string {
 function getMineCubeCoordinateLabel(coordinate: CubeCoordinate): string {
   const layer = coordinate.depth === 0 ? 'surface' : `depth ${coordinate.depth}`;
   return `Mine cube cell ${coordinate.face} row ${coordinate.row + 1} column ${coordinate.col + 1} ${layer}`;
+}
+
+function getRevealedCubeCoordinateLabel(cell: CubeCell): string {
+  const layer = cell.depth === 0 ? 'surface' : `depth ${cell.depth}`;
+  return `Revealed cube cell ${cell.face} row ${cell.row + 1} column ${cell.col + 1} ${layer} with ${cell.surfaceNeighborMines} surface mines and ${cell.depthMineCount} depth mines`;
+}
+
+function getFlaggedCubeCoordinateLabel(coordinate: CubeCoordinate): string {
+  const layer = coordinate.depth === 0 ? 'surface' : `depth ${coordinate.depth}`;
+  return `Flagged cube cell ${coordinate.face} row ${coordinate.row + 1} column ${coordinate.col + 1} ${layer}`;
 }
 
 function getDepthStackLabel(surfaceCell: CubeCell): string {

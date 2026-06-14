@@ -31,6 +31,7 @@ export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: Cube
       onClick={() => {
         if (suppressNextTouchClick.current) {
           suppressNextTouchClick.current = false;
+          suppressNextTouchContextMenu.current = false;
           suppressNextFocusPeek.current = false;
           return;
         }
@@ -41,6 +42,7 @@ export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: Cube
       onContextMenu={(event) => {
         event.preventDefault();
         if (suppressNextTouchContextMenu.current) {
+          suppressNextTouchClick.current = false;
           suppressNextTouchContextMenu.current = false;
           return;
         }
