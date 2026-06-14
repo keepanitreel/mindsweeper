@@ -65,7 +65,10 @@ test('selects Cube Mode and performs a basic cube interaction', async ({ page })
   await expect(page.getByLabel('Cube difficulty')).toHaveValue('starter');
   await expect(page.getByRole('button', { name: /rotate left/i })).toBeVisible();
 
+  const cube = page.locator('.cube');
+  const initialCubeTransform = await cube.evaluate((element) => getComputedStyle(element).transform);
   await page.getByRole('button', { name: /rotate left/i }).click();
+  await expect.poll(async () => cube.evaluate((element) => getComputedStyle(element).transform)).not.toBe(initialCubeTransform);
   await page.getByRole('gridcell', { name: /covered cube cell right row 2 column 2 surface/i }).click();
 
   await expect(page.getByText('Playing')).toBeVisible();
