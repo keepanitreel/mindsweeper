@@ -2,6 +2,8 @@
 
 Date: 2026-06-14
 
+Revision note, 2026-06-14: hidden depth stacks, depth markers, depth peeking, and the Deep Cube preset were removed after usability feedback. Current Cube Mode is surface-only across the six cube faces, with Starter Cube and Standard Cube presets.
+
 ## Goal
 
 Add a new Cube Mode alongside the existing Classic Mode. Classic Mode must keep its current flat board gameplay, presets, best times, and UI behavior. Cube Mode should feel like familiar Minesweeper logic applied to a physical 3D object: the player rotates a cube, solves connected face grids, and drills into shallow depth stacks when needed.

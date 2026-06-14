@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { CUBE_PRESETS } from './presets';
 import { armCubeBoard, chordCubeCell, createInitialCubeGame, revealCubeCell, toggleCubeFlag } from './engine';
-import { coordinateKey, getDepthStackCoordinates, getSurfaceNeighbors } from './geometry';
+import { coordinateKey, getSurfaceNeighbors } from './geometry';
 import type { CubeCell, CubeCoordinate, CubeGameState } from './types';
 
 describe('cube engine setup', () => {
-  it('creates an unarmed board for every face and depth layer', () => {
+  it('creates an unarmed surface-only board for every face', () => {
     const game = createInitialCubeGame(CUBE_PRESETS.starter);
 
     expect(game.status).toBe('ready');
     expect(game.isArmed).toBe(false);
     expect(Object.keys(game.board)).toHaveLength(6);
-    expect(game.board.front).toHaveLength(3);
+    expect(game.board.front).toHaveLength(1);
     expect(game.board.front[0]).toHaveLength(4);
     expect(game.board.front[0][0]).toHaveLength(4);
     expect(game.board.front[0][0][0]).toMatchObject({ face: 'front', row: 0, col: 0, depth: 0, hasMine: false });
@@ -25,7 +25,6 @@ describe('cube engine setup', () => {
     const safeCoordinates = [
       firstClick,
       ...getSurfaceNeighbors(firstClick, CUBE_PRESETS.starter.size),
-      ...getDepthStackCoordinates(firstClick, CUBE_PRESETS.starter.hiddenDepth),
     ];
 
     expect(armed.isArmed).toBe(true);
@@ -41,7 +40,6 @@ describe('cube engine setup', () => {
     const safeCoordinates = [
       firstClick,
       ...getSurfaceNeighbors(firstClick, CUBE_PRESETS.starter.size),
-      ...getDepthStackCoordinates(firstClick, CUBE_PRESETS.starter.hiddenDepth),
     ];
 
     expect(getSurfaceNeighbors(firstClick, CUBE_PRESETS.starter.size)).toContainEqual(adjacentFaceNeighbor);
@@ -49,12 +47,11 @@ describe('cube engine setup', () => {
     expect(safeCoordinates.every((coordinate) => !cellAt(armed, coordinate).hasMine)).toBe(true);
   });
 
-  it('calculates exact surface numbers and depth markers for known mines', () => {
-    const game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 2, mines: 2 });
+  it('calculates exact surface numbers for known mines', () => {
+    const game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, mines: 1 });
     const firstClick = { face: 'front' as const, row: 1, col: 1, depth: 0 };
-    const hiddenMine: CubeCoordinate = { face: 'front', row: 3, col: 3, depth: 1 };
     const surfaceMine: CubeCoordinate = { face: 'front', row: 1, col: 3, depth: 0 };
-    const armed = armCubeBoard(game, firstClick, randomForMineTargets(game, firstClick, [hiddenMine, surfaceMine]));
+    const armed = armCubeBoard(game, firstClick, randomForMineTargets(game, firstClick, [surfaceMine]));
     const expectedSurfaceNeighborMines = new Map(
       [
         { face: 'front' as const, row: 0, col: 2, depth: 0 },
@@ -66,15 +63,13 @@ describe('cube engine setup', () => {
       ].map((coordinate) => [coordinateKey(coordinate), 1]),
     );
 
-    expect(getAllCells(armed).filter((cell) => cell.hasMine)).toHaveLength(2);
-    expect(cellAt(armed, hiddenMine).hasMine).toBe(true);
+    expect(getAllCells(armed).filter((cell) => cell.hasMine)).toHaveLength(1);
     expect(cellAt(armed, surfaceMine).hasMine).toBe(true);
 
     getSurfaceCells(armed).forEach((cell) => {
       const key = coordinateKey(cell);
 
       expect(cell.surfaceNeighborMines, `${key} surface clue`).toBe(expectedSurfaceNeighborMines.get(key) ?? 0);
-      expect(cell.depthMineCount, `${key} depth clue`).toBe(key === coordinateKey({ face: 'front', row: 3, col: 3, depth: 0 }) ? 1 : 0);
     });
   });
 
@@ -84,7 +79,7 @@ describe('cube engine setup', () => {
 
     expect(armed.board).not.toBe(game.board);
     expect(getAllCells(armed).filter((cell) => cell.hasMine)).toHaveLength(24);
-    expect(getAllCells(game).every((cell) => !cell.hasMine && cell.surfaceNeighborMines === 0 && cell.depthMineCount === 0)).toBe(true);
+    expect(getAllCells(game).every((cell) => !cell.hasMine && cell.surfaceNeighborMines === 0)).toBe(true);
   });
 });
 
@@ -121,28 +116,16 @@ describe('cube engine actions', () => {
     expect(next.revealedCount).toBeGreaterThan(0);
   });
 
-  it('auto-reveals safe depth cells when a revealed surface has no depth mines', () => {
-    const game = createInitialCubeGame(CUBE_PRESETS.starter);
-    const firstClick = { face: 'front' as const, row: 1, col: 1, depth: 0 };
-    const next = revealCubeCell(game, firstClick, () => 0);
-    const stack = getDepthStackCoordinates(firstClick, CUBE_PRESETS.starter.hiddenDepth).map((coordinate) => cellAt(next, coordinate));
-
-    expect(cellAt(next, firstClick).depthMineCount).toBe(0);
-    expect(stack.every((cell) => cell.isRevealed)).toBe(true);
-  });
-
-  it('toggles flags on covered surface and depth cells', () => {
+  it('toggles flags on covered surface cells', () => {
     const game = createInitialCubeGame(CUBE_PRESETS.starter);
     const flaggedSurface = toggleCubeFlag(game, { face: 'front', row: 0, col: 0, depth: 0 });
-    const flaggedDepth = toggleCubeFlag(flaggedSurface, { face: 'front', row: 0, col: 0, depth: 1 });
 
     expect(flaggedSurface.board.front[0][0][0].isFlagged).toBe(true);
-    expect(flaggedDepth.board.front[1][0][0].isFlagged).toBe(true);
-    expect(flaggedDepth.flaggedCount).toBe(2);
+    expect(flaggedSurface.flaggedCount).toBe(1);
   });
 
   it('loses and reveals mines when a mine is revealed', () => {
-    const game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 2, mines: 1 });
+    const game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, mines: 1 });
     const armed = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
     const mine = Object.values(armed.board).flat(3).find((cell) => cell.hasMine)!;
     const lost = revealCubeCell(armed, mine);
@@ -158,7 +141,7 @@ describe('cube engine actions', () => {
   });
 
   it('wins when every safe cube cell is revealed', () => {
-    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 3, hiddenDepth: 1, mines: 1 });
+    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 3, mines: 1 });
     game = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
 
     for (const cell of Object.values(game.board).flat(3)) {
@@ -171,7 +154,7 @@ describe('cube engine actions', () => {
   });
 
   it('surface-chords revealed cells when adjacent surface flags match the surface number', () => {
-    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 1, mines: 1 });
+    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, mines: 1 });
     game = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
     const mine = Object.values(game.board)
       .flat(3)
@@ -203,7 +186,6 @@ function randomForMineTargets(game: CubeGameState, firstClick: CubeCoordinate, t
   const safeKeys = new Set([
     coordinateKey(firstClick),
     ...getSurfaceNeighbors(firstClick, game.preset.size).map(coordinateKey),
-    ...getDepthStackCoordinates(firstClick, game.preset.hiddenDepth).map(coordinateKey),
   ]);
   const candidates = getAllCells(game).filter((cell) => !safeKeys.has(coordinateKey(cell)));
   const targetIndexes = targets.map((target) => candidates.findIndex((cell) => coordinateKey(cell) === coordinateKey(target)));

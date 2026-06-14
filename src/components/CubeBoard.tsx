@@ -15,10 +15,9 @@ interface CubeBoardProps {
   onRotate: (rotation: CubeRotation) => void;
   onCellPrimary: (cell: CubeCell) => void;
   onCellFlag: (cell: CubeCell) => void;
-  onPeek: (cell: CubeCell | null) => void;
 }
 
-export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onCellFlag, onPeek }: CubeBoardProps) {
+export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onCellFlag }: CubeBoardProps) {
   const dragStart = useRef<{ x: number; y: number; rotation: CubeRotation } | null>(null);
   const boardStyle = {
     '--cube-size': game.preset.size,
@@ -80,24 +79,14 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
     onCellFlag(cell);
   }
 
-  function handlePointerMoveCapture(event: PointerEvent<HTMLDivElement>) {
-    if (dragStart.current) {
-      return;
-    }
-
-    onPeek(getCellFromPoint(event.currentTarget, game, event.clientX, event.clientY));
-  }
-
   return (
     <div
       className="cube-stage"
       style={boardStyle}
       onPointerDown={handlePointerDown}
-      onPointerMoveCapture={handlePointerMoveCapture}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onPointerLeave={() => onPeek(null)}
       onClickCapture={handleClickCapture}
       onContextMenuCapture={handleContextMenuCapture}
     >
@@ -105,7 +94,7 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
         {CUBE_FACES.map((face) => (
           <div className={`cube-face cube-face-${face}`} role="grid" aria-label={`${face} cube face`} key={face}>
             {game.board[face][0].flat().map((cell) => (
-              <CubeCellButton key={cell.id} cell={cell} onPrimary={onCellPrimary} onFlag={onCellFlag} onPeek={onPeek} />
+              <CubeCellButton key={cell.id} cell={cell} onPrimary={onCellPrimary} onFlag={onCellFlag} />
             ))}
           </div>
         ))}

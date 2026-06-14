@@ -1,5 +1,5 @@
 import type { CubeBoard, CubeCell, CubeCoordinate, CubeFace, CubeGameState, CubePreset } from './types';
-import { CUBE_FACES, coordinateKey, getDepthStackCoordinates, getSurfaceNeighbors } from './geometry';
+import { CUBE_FACES, coordinateKey, getSurfaceNeighbors } from './geometry';
 
 export type RandomSource = () => number;
 
@@ -16,7 +16,7 @@ export function createInitialCubeGame(preset: CubePreset): CubeGameState {
 
 export function createEmptyCubeBoard(preset: CubePreset): CubeBoard {
   return CUBE_FACES.reduce((board, face) => {
-    board[face] = Array.from({ length: preset.hiddenDepth + 1 }, (_, depth) =>
+    board[face] = Array.from({ length: 1 }, (_, depth) =>
       Array.from({ length: preset.size }, (_, row) =>
         Array.from({ length: preset.size }, (_, col): CubeCell => ({
           id: `${face}-${row}-${col}-${depth}`,
@@ -26,7 +26,6 @@ export function createEmptyCubeBoard(preset: CubePreset): CubeBoard {
           depth,
           hasMine: false,
           surfaceNeighborMines: 0,
-          depthMineCount: 0,
           isRevealed: false,
           isFlagged: false,
           isExploded: false,
@@ -47,7 +46,6 @@ export function armCubeBoard(game: CubeGameState, firstClick: CubeCoordinate, ra
   const safeKeys = new Set([
     coordinateKey(firstClick),
     ...getSurfaceNeighbors(firstClick, game.preset.size).map(coordinateKey),
-    ...getDepthStackCoordinates(firstClick, game.preset.hiddenDepth).map(coordinateKey),
   ]);
   const candidates = getAllCubeCells(board).filter((cell) => !safeKeys.has(coordinateKey(cell)));
   const shuffled = shuffle(candidates, random);
@@ -165,23 +163,10 @@ function revealSurfaceSafeCells(board: CubeBoard, start: CubeCoordinate, preset:
     board[cell.face][0][cell.row][cell.col] = { ...cell, isRevealed: true };
     const revealedCell = board[cell.face][0][cell.row][cell.col];
 
-    if (revealedCell.depthMineCount === 0) {
-      revealSafeDepthStack(board, revealedCell, preset);
-    }
-
-    if (revealedCell.surfaceNeighborMines === 0 && revealedCell.depthMineCount === 0) {
+    if (revealedCell.surfaceNeighborMines === 0) {
       getSurfaceNeighbors(revealedCell, preset.size).forEach((neighbor) => queue.push(neighbor));
     }
   }
-}
-
-function revealSafeDepthStack(board: CubeBoard, surfaceCell: CubeCell, preset: CubePreset): void {
-  getDepthStackCoordinates(surfaceCell, preset.hiddenDepth).forEach((coordinate) => {
-    const cell = board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col];
-    if (!cell.hasMine && !cell.isFlagged) {
-      board[cell.face][cell.depth][cell.row][cell.col] = { ...cell, isRevealed: true };
-    }
-  });
 }
 
 function revealCubeLoss(game: CubeGameState, exploded: CubeCoordinate): CubeGameState {
@@ -225,10 +210,7 @@ function calculateCubeClues(board: CubeBoard, preset: CubePreset): void {
         const surfaceNeighborMines = getSurfaceNeighbors(cell, preset.size).filter(
           (neighbor) => board[neighbor.face][0][neighbor.row][neighbor.col].hasMine,
         ).length;
-        const depthMineCount = getDepthStackCoordinates(cell, preset.hiddenDepth).filter(
-          (coordinate) => board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col].hasMine,
-        ).length;
-        board[cell.face][0][cell.row][cell.col] = { ...cell, surfaceNeighborMines, depthMineCount };
+        board[cell.face][0][cell.row][cell.col] = { ...cell, surfaceNeighborMines };
       });
     });
   });
