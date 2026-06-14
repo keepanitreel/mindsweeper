@@ -99,7 +99,8 @@ h1 {
 .icon-button svg,
 .flag-toggle svg,
 .stat svg,
-.best-time svg {
+.best-time svg,
+.result-actions svg {
   width: 19px;
   height: 19px;
 }
@@ -297,6 +298,19 @@ input {
 .result-banner button {
   min-height: 38px;
   padding: 0 14px;
+}
+
+.result-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.result-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @media (max-width: 720px) {

@@ -33,3 +33,22 @@ test('renders usable mobile layout', async ({ page }) => {
   await expect(page.getByRole('button', { name: /new game/i })).toBeVisible();
   await expect(page.getByRole('grid')).toBeVisible();
 });
+
+test('undoes the move that hit a mine', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+
+  await page.getByRole('gridcell', { name: /covered cell row 5 column 5/i }).click();
+  await page.getByRole('gridcell', { name: /covered cell row 1 column 2/i }).click();
+
+  await expect(page.getByText('Game over')).toBeVisible();
+  await expect(page.getByRole('gridcell', { name: /mine cell row 1 column 2/i })).toBeVisible();
+
+  await page.getByRole('button', { name: /undo last move/i }).click();
+
+  await expect(page.getByText('Playing')).toBeVisible();
+  await expect(page.getByText('Game over')).toBeHidden();
+  await expect(page.getByRole('gridcell', { name: /covered cell row 1 column 2/i })).toBeVisible();
+});

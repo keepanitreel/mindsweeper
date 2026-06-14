@@ -1,4 +1,4 @@
-import { Bomb, Flag, Gauge, RotateCcw, Timer } from 'lucide-react';
+import { Bomb, Flag, Gauge, RotateCcw, Timer, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { chordCell, createInitialGame, revealCell, toggleFlag } from './game/engine';
@@ -11,6 +11,11 @@ type BestTimes = Partial<Record<DifficultyId, number>>;
 
 const presetList = [DIFFICULTY_PRESETS.easy, DIFFICULTY_PRESETS.medium, DIFFICULTY_PRESETS.expert];
 
+interface UndoSnapshot {
+  game: GameState;
+  elapsedSeconds: number;
+}
+
 export default function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>(DIFFICULTY_PRESETS.easy);
   const [game, setGame] = useState<GameState>(() => createInitialGame(DIFFICULTY_PRESETS.easy));
@@ -21,6 +26,7 @@ export default function App() {
   const [customMines, setCustomMines] = useState(20);
   const [customError, setCustomError] = useState('');
   const [bestTimes, setBestTimes] = useState<BestTimes>(() => readBestTimes());
+  const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
 
   useEffect(() => {
     if (game.status !== 'playing') {
@@ -60,6 +66,7 @@ export default function App() {
     setGame(createInitialGame(nextDifficulty));
     setElapsedSeconds(0);
     setCustomError('');
+    setUndoSnapshot(null);
   }
 
   function changeDifficulty(value: string) {
@@ -90,21 +97,43 @@ export default function App() {
 
   function handleCellPrimary(cell: Cell) {
     if (flagMode) {
-      setGame((current) => toggleFlag(current, cell));
+      setGame(toggleFlag(game, cell));
       return;
     }
+
+    const previousGame = game;
+    const previousElapsedSeconds = elapsedSeconds;
+    let nextGame: GameState;
 
     if (cell.isRevealed) {
-      setGame((current) => chordCell(current, cell));
-      return;
+      nextGame = chordCell(previousGame, cell);
+    } else {
+      nextGame = revealCell(previousGame, cell);
     }
 
-    setGame((current) => revealCell(current, cell));
+    if (previousGame.status !== 'lost' && nextGame.status === 'lost') {
+      setUndoSnapshot({ game: previousGame, elapsedSeconds: previousElapsedSeconds });
+    } else if (nextGame.status !== 'lost') {
+      setUndoSnapshot(null);
+    }
+
+    setGame(nextGame);
   }
 
   function handleContextMenu(event: MouseEvent, cell: Cell) {
     event.preventDefault();
-    setGame((current) => toggleFlag(current, cell));
+    setGame(toggleFlag(game, cell));
+  }
+
+  function undoLastMove() {
+    if (!undoSnapshot) {
+      return;
+    }
+
+    setDifficulty(undoSnapshot.game.difficulty);
+    setGame(undoSnapshot.game);
+    setElapsedSeconds(undoSnapshot.elapsedSeconds);
+    setUndoSnapshot(null);
   }
 
   const boardStyle = useMemo(
@@ -195,9 +224,17 @@ export default function App() {
           <div className="result-banner" role="status">
             <strong>{game.status === 'won' ? 'Board cleared' : 'Game over'}</strong>
             <span>{game.status === 'won' ? `Finished in ${elapsedSeconds} seconds.` : 'A mine ended the run.'}</span>
-            <button type="button" onClick={() => startNewGame()}>
-              New game
-            </button>
+            <div className="result-actions">
+              {game.status === 'lost' && undoSnapshot ? (
+                <button type="button" onClick={undoLastMove} aria-label="Undo last move">
+                  <Undo2 aria-hidden="true" />
+                  Undo
+                </button>
+              ) : null}
+              <button type="button" onClick={() => startNewGame()}>
+                New game
+              </button>
+            </div>
           </div>
         ) : null}
       </section>

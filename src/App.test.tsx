@@ -1,7 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('Minesweeper app', () => {
   it('renders the Microsoft-style Classic Mode shell', () => {
@@ -39,5 +43,23 @@ describe('Minesweeper app', () => {
 
     expect(screen.getAllByRole('gridcell', { name: /covered cell/i })).toHaveLength(480);
     expect(screen.getByText('099')).toBeInTheDocument();
+  });
+
+  it('undoes the mine hit that ended the game', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('gridcell', { name: 'Covered cell row 5 column 5' }));
+    await user.click(screen.getByRole('gridcell', { name: 'Covered cell row 1 column 2' }));
+
+    expect(screen.getByText('Game over')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Mine cell row 1 column 2' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /undo last move/i }));
+
+    expect(screen.queryByText('Game over')).not.toBeInTheDocument();
+    expect(screen.getByText('Playing')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'Covered cell row 1 column 2' })).toBeInTheDocument();
   });
 });
