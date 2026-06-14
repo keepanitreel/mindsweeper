@@ -49,8 +49,6 @@ export default function CubeCellButton({ cell, onPrimary, onFlag, onPeek }: Cube
 
         onFlag(cell);
       }}
-      onMouseEnter={() => onPeek(cell)}
-      onMouseLeave={() => onPeek(null)}
       onFocus={() => {
         if (!suppressNextFocusPeek.current) {
           onPeek(cell);

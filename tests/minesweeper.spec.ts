@@ -117,3 +117,36 @@ test('opens a Cube Mode depth stack after revealing a depth-marked surface cell'
 
   await expect(page.getByLabel(/depth stack for/i)).toBeVisible();
 });
+
+test('clicks the intended Cube Mode square near a projected face edge', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /cube mode/i }).click();
+  await page.getByRole('button', { name: /flag mode/i }).click();
+
+  const targetCell = page.getByRole('gridcell', { name: /covered cube cell top row 4 column 2 surface/i });
+  const point = await targetCell.evaluate((element) => {
+    const marker = document.createElement('span');
+    marker.style.position = 'absolute';
+    marker.style.left = '80%';
+    marker.style.top = '20%';
+    marker.style.width = '1px';
+    marker.style.height = '1px';
+    marker.style.pointerEvents = 'none';
+    marker.style.opacity = '0';
+    element.append(marker);
+
+    const rect = marker.getBoundingClientRect();
+    marker.remove();
+
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+  });
+
+  await page.mouse.click(point.x, point.y);
+
+  await expect(page.getByRole('gridcell', { name: /flagged cube cell top row 4 column 2 surface/i })).toBeVisible();
+});

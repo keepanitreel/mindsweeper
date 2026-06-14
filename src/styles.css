@@ -477,6 +477,10 @@ input {
   cursor: grabbing;
 }
 
+.cube-stage-picking .cube-cell {
+  pointer-events: none;
+}
+
 .cube {
   position: relative;
   width: var(--cube-face-size);
