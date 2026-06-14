@@ -34,6 +34,26 @@ test('renders usable mobile layout', async ({ page }) => {
   await expect(page.getByRole('grid')).toBeVisible();
 });
 
+test('makes the classic playing field the dominant desktop region', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto('/');
+
+  const boardRegion = page.locator('.board-wrap');
+  const boardBox = await boardRegion.boundingBox();
+  const controlBox = await page.locator('.control-strip').boundingBox();
+  const hudBox = await page.locator('.hud').boundingBox();
+  const subHudBox = await page.locator('.sub-hud').boundingBox();
+
+  expect(boardBox).not.toBeNull();
+  expect(controlBox).not.toBeNull();
+  expect(hudBox).not.toBeNull();
+  expect(subHudBox).not.toBeNull();
+
+  const chromeHeight = controlBox!.height + hudBox!.height + subHudBox!.height;
+  expect(boardBox!.height).toBeGreaterThan(720 * 0.64);
+  expect(boardBox!.height).toBeGreaterThan(chromeHeight * 2);
+});
+
 test('undoes the move that hit a mine', async ({ page }) => {
   await page.addInitScript(() => {
     Math.random = () => 0;
