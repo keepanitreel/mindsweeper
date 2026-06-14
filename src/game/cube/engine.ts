@@ -66,11 +66,16 @@ export function revealCubeCell(game: CubeGameState, coordinate: CubeCoordinate, 
     return game;
   }
 
+  const currentTarget = game.board[coordinate.face]?.[coordinate.depth]?.[coordinate.row]?.[coordinate.col];
+  if (!currentTarget || currentTarget.isFlagged || currentTarget.isRevealed) {
+    return game;
+  }
+
   const armed = game.isArmed ? game : armCubeBoard(game, coordinate, random);
   const target = armed.board[coordinate.face]?.[coordinate.depth]?.[coordinate.row]?.[coordinate.col];
 
   if (!target || target.isFlagged || target.isRevealed) {
-    return armed;
+    return game;
   }
 
   if (target.hasMine) {

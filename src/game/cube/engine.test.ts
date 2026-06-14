@@ -89,6 +89,28 @@ describe('cube engine setup', () => {
 });
 
 describe('cube engine actions', () => {
+  it('ignores an invalid fresh reveal without arming', () => {
+    const game = createInitialCubeGame(CUBE_PRESETS.starter);
+    const next = revealCubeCell(game, { face: 'front', row: 99, col: 1, depth: 0 }, () => 0);
+
+    expect(next).toBe(game);
+    expect(next.status).toBe('ready');
+    expect(next.isArmed).toBe(false);
+  });
+
+  it('ignores a flagged fresh reveal without arming', () => {
+    const game = createInitialCubeGame(CUBE_PRESETS.starter);
+    const coordinate = { face: 'front' as const, row: 0, col: 0, depth: 0 };
+    const flagged = toggleCubeFlag(game, coordinate);
+    const next = revealCubeCell(flagged, coordinate, () => 0);
+
+    expect(next).toBe(flagged);
+    expect(next.status).toBe('ready');
+    expect(next.isArmed).toBe(false);
+    expect(next.board.front[0][0][0].isFlagged).toBe(true);
+    expect(next.flaggedCount).toBe(1);
+  });
+
   it('reveals a first surface cell and starts play', () => {
     const game = createInitialCubeGame(CUBE_PRESETS.starter);
     const next = revealCubeCell(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
