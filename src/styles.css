@@ -41,6 +41,42 @@ input {
     linear-gradient(135deg, #07150f 0%, #153d2b 48%, #071c14 100%);
 }
 
+.mode-shell {
+  width: min(100%, 1120px);
+}
+
+.mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  flex-wrap: wrap;
+}
+
+.mode-switch button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(210, 255, 183, 0.22);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #d7efc9;
+  background: #071a12;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.mode-switch button.active {
+  color: #102116;
+  background: var(--accent-strong);
+}
+
+.mode-switch svg {
+  width: 18px;
+  height: 18px;
+}
+
 .game-panel {
   width: min(100%, 1120px);
   padding: 18px;

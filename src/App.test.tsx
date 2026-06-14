@@ -62,4 +62,22 @@ describe('Minesweeper app', () => {
     expect(screen.getByText('Playing')).toBeInTheDocument();
     expect(screen.getByRole('gridcell', { name: 'Covered cell row 1 column 2' })).toBeInTheDocument();
   });
+
+  it('switches between Classic and Cube Mode shells', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(screen.getByText('Classic Mode')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+
+    expect(screen.getByRole('heading', { name: 'Cube Mode' })).toBeInTheDocument();
+    expect(screen.getByText('Starter Cube')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Difficulty')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^classic$/i }));
+
+    expect(screen.getByText('Classic Mode')).toBeInTheDocument();
+    expect(screen.getAllByRole('gridcell', { name: /covered cell/i })).toHaveLength(81);
+  });
 });
