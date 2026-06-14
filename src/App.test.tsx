@@ -79,12 +79,39 @@ describe('Minesweeper app', () => {
     await user.click(screen.getByRole('button', { name: /cube mode/i }));
 
     expect(screen.getByRole('heading', { name: 'Cube Mode' })).toBeInTheDocument();
-    expect(screen.getByText('Starter Cube')).toBeInTheDocument();
+    expect(screen.getAllByText('Starter Cube').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText('Difficulty')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^classic$/i }));
 
     expect(screen.getByText('Classic Mode')).toBeInTheDocument();
     expect(screen.getAllByRole('gridcell', { name: /covered cell/i })).toHaveLength(81);
+  });
+
+  it('renders Cube Mode controls and cells', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+
+    expect(screen.getByRole('heading', { name: 'Cube Mode' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Cube difficulty')).toHaveValue('starter');
+    expect(screen.getByRole('button', { name: /rotate left/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('gridcell', { name: /covered cube cell/i }).length).toBeGreaterThan(0);
+  });
+
+  it('reveals and flags Cube Mode cells', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('button', { name: /cube mode/i }));
+    await user.click(screen.getByRole('gridcell', { name: /covered cube cell front row 2 column 2 surface/i }));
+
+    expect(screen.getByText('Playing')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /flag mode/i }));
+    await user.click(screen.getAllByRole('gridcell', { name: /covered cube cell/i })[0]);
+
+    expect(screen.getByRole('gridcell', { name: /flagged cube cell/i })).toBeInTheDocument();
   });
 });

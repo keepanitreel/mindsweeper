@@ -1,6 +1,7 @@
 import { Box, Grid2X2 } from 'lucide-react';
 import { useState } from 'react';
 import ClassicGame from './components/ClassicGame';
+import CubeGame from './components/CubeGame';
 
 type GameMode = 'classic' | 'cube';
 
@@ -21,21 +22,8 @@ export default function App() {
           </button>
         </nav>
 
-        {mode === 'classic' ? <ClassicGame /> : <CubeModeShell />}
+        {mode === 'classic' ? <ClassicGame /> : <CubeGame />}
       </div>
     </main>
-  );
-}
-
-function CubeModeShell() {
-  return (
-    <section className="game-panel cube-game-panel" aria-label="Cube Mode Minesweeper">
-      <header className="game-header">
-        <div>
-          <p className="eyebrow">Starter Cube</p>
-          <h1>Cube Mode</h1>
-        </div>
-      </header>
-    </section>
   );
 }
