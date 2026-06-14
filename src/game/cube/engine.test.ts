@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CUBE_PRESETS } from './presets';
-import { armCubeBoard, createInitialCubeGame } from './engine';
+import { armCubeBoard, chordCubeCell, createInitialCubeGame, revealCubeCell, toggleCubeFlag } from './engine';
 import { coordinateKey, getDepthStackCoordinates, getSurfaceNeighbors } from './geometry';
 import type { CubeCell, CubeCoordinate, CubeGameState } from './types';
 
@@ -85,6 +85,73 @@ describe('cube engine setup', () => {
     expect(armed.board).not.toBe(game.board);
     expect(getAllCells(armed).filter((cell) => cell.hasMine)).toHaveLength(24);
     expect(getAllCells(game).every((cell) => !cell.hasMine && cell.surfaceNeighborMines === 0 && cell.depthMineCount === 0)).toBe(true);
+  });
+});
+
+describe('cube engine actions', () => {
+  it('reveals a first surface cell and starts play', () => {
+    const game = createInitialCubeGame(CUBE_PRESETS.starter);
+    const next = revealCubeCell(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
+
+    expect(next.status).toBe('playing');
+    expect(next.isArmed).toBe(true);
+    expect(next.board.front[0][1][1].isRevealed).toBe(true);
+    expect(next.revealedCount).toBeGreaterThan(0);
+  });
+
+  it('toggles flags on covered surface and depth cells', () => {
+    const game = createInitialCubeGame(CUBE_PRESETS.starter);
+    const flaggedSurface = toggleCubeFlag(game, { face: 'front', row: 0, col: 0, depth: 0 });
+    const flaggedDepth = toggleCubeFlag(flaggedSurface, { face: 'front', row: 0, col: 0, depth: 1 });
+
+    expect(flaggedSurface.board.front[0][0][0].isFlagged).toBe(true);
+    expect(flaggedDepth.board.front[1][0][0].isFlagged).toBe(true);
+    expect(flaggedDepth.flaggedCount).toBe(2);
+  });
+
+  it('loses and reveals mines when a mine is revealed', () => {
+    const game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 2, mines: 1 });
+    const armed = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
+    const mine = Object.values(armed.board).flat(3).find((cell) => cell.hasMine)!;
+    const lost = revealCubeCell(armed, mine);
+
+    expect(lost.status).toBe('lost');
+    expect(lost.board[mine.face][mine.depth][mine.row][mine.col].isExploded).toBe(true);
+    expect(
+      Object.values(lost.board)
+        .flat(3)
+        .filter((cell) => cell.hasMine)
+        .every((cell) => cell.isRevealed),
+    ).toBe(true);
+  });
+
+  it('wins when every safe cube cell is revealed', () => {
+    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 3, hiddenDepth: 1, mines: 1 });
+    game = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
+
+    for (const cell of Object.values(game.board).flat(3)) {
+      if (!cell.hasMine) {
+        game = revealCubeCell(game, cell);
+      }
+    }
+
+    expect(game.status).toBe('won');
+  });
+
+  it('surface-chords revealed cells when adjacent surface flags match the surface number', () => {
+    let game = createInitialCubeGame({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 1, mines: 1 });
+    game = armCubeBoard(game, { face: 'front', row: 1, col: 1, depth: 0 }, () => 0);
+    const mine = Object.values(game.board)
+      .flat(3)
+      .find((cell) => cell.hasMine && cell.depth === 0)!;
+    const numbered = getSurfaceNeighbors(mine, 4).find((coordinate) => !game.board[coordinate.face][0][coordinate.row][coordinate.col].hasMine)!;
+
+    game = revealCubeCell(game, numbered);
+    game = toggleCubeFlag(game, mine);
+
+    const chorded = chordCubeCell(game, numbered);
+
+    expect(chorded.revealedCount).toBeGreaterThan(game.revealedCount);
   });
 });
 

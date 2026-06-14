@@ -61,11 +61,134 @@ export function armCubeBoard(game: CubeGameState, firstClick: CubeCoordinate, ra
   return { ...game, board, isArmed: true };
 }
 
+export function revealCubeCell(game: CubeGameState, coordinate: CubeCoordinate, random: RandomSource = Math.random): CubeGameState {
+  if (game.status === 'won' || game.status === 'lost') {
+    return game;
+  }
+
+  const armed = game.isArmed ? game : armCubeBoard(game, coordinate, random);
+  const target = armed.board[coordinate.face]?.[coordinate.depth]?.[coordinate.row]?.[coordinate.col];
+
+  if (!target || target.isFlagged || target.isRevealed) {
+    return armed;
+  }
+
+  if (target.hasMine) {
+    return revealCubeLoss(armed, coordinate);
+  }
+
+  const board = cloneCubeBoard(armed.board);
+  if (coordinate.depth === 0) {
+    revealSurfaceSafeCells(board, coordinate, armed.preset);
+  } else {
+    board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col] = { ...target, isRevealed: true };
+  }
+
+  return finalizeCubeProgress(armed, board);
+}
+
+export function toggleCubeFlag(game: CubeGameState, coordinate: CubeCoordinate): CubeGameState {
+  if (game.status === 'won' || game.status === 'lost') {
+    return game;
+  }
+
+  const target = game.board[coordinate.face]?.[coordinate.depth]?.[coordinate.row]?.[coordinate.col];
+  if (!target || target.isRevealed) {
+    return game;
+  }
+
+  const board = cloneCubeBoard(game.board);
+  board[coordinate.face][coordinate.depth][coordinate.row][coordinate.col] = { ...target, isFlagged: !target.isFlagged };
+
+  return { ...game, board, flaggedCount: countCubeFlags(board) };
+}
+
+export function chordCubeCell(game: CubeGameState, coordinate: CubeCoordinate): CubeGameState {
+  if (game.status !== 'playing' || coordinate.depth !== 0) {
+    return game;
+  }
+
+  const target = game.board[coordinate.face]?.[0]?.[coordinate.row]?.[coordinate.col];
+  if (!target?.isRevealed || target.surfaceNeighborMines === 0) {
+    return game;
+  }
+
+  const neighbors = getSurfaceNeighbors(target, game.preset.size);
+  const flagCount = neighbors.filter((neighbor) => game.board[neighbor.face][0][neighbor.row][neighbor.col].isFlagged).length;
+  if (flagCount !== target.surfaceNeighborMines) {
+    return game;
+  }
+
+  return neighbors.reduce((nextGame, neighbor) => {
+    const cell = nextGame.board[neighbor.face][0][neighbor.row][neighbor.col];
+    return cell.isRevealed || cell.isFlagged ? nextGame : revealCubeCell(nextGame, neighbor);
+  }, game);
+}
+
 export function cloneCubeBoard(board: CubeBoard): CubeBoard {
   return CUBE_FACES.reduce((next, face) => {
     next[face] = board[face].map((layer) => layer.map((row) => row.map((cell) => ({ ...cell }))));
     return next;
   }, {} as Record<CubeFace, CubeCell[][][]>);
+}
+
+function revealSurfaceSafeCells(board: CubeBoard, start: CubeCoordinate, preset: CubePreset): void {
+  const queue = [start];
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const coordinate = queue.shift()!;
+    const key = coordinateKey(coordinate);
+    if (visited.has(key)) {
+      continue;
+    }
+
+    visited.add(key);
+    const cell = board[coordinate.face][0][coordinate.row][coordinate.col];
+    if (cell.isRevealed || cell.isFlagged || cell.hasMine) {
+      continue;
+    }
+
+    board[cell.face][0][cell.row][cell.col] = { ...cell, isRevealed: true };
+
+    if (cell.surfaceNeighborMines === 0 && cell.depthMineCount === 0) {
+      getSurfaceNeighbors(cell, preset.size).forEach((neighbor) => queue.push(neighbor));
+    }
+  }
+}
+
+function revealCubeLoss(game: CubeGameState, exploded: CubeCoordinate): CubeGameState {
+  const board = cloneCubeBoard(game.board);
+
+  getAllCubeCells(board).forEach((cell) => {
+    if (cell.hasMine) {
+      board[cell.face][cell.depth][cell.row][cell.col] = {
+        ...cell,
+        isRevealed: true,
+        isExploded: coordinateKey(cell) === coordinateKey(exploded),
+      };
+    } else if (cell.isFlagged) {
+      board[cell.face][cell.depth][cell.row][cell.col] = { ...cell, isIncorrectFlag: true };
+    }
+  });
+
+  return { ...game, board, status: 'lost', revealedCount: countCubeRevealed(board), flaggedCount: countCubeFlags(board) };
+}
+
+function finalizeCubeProgress(game: CubeGameState, board: CubeBoard): CubeGameState {
+  const revealedCount = countCubeRevealed(board);
+  const safeCells = getAllCubeCells(board).filter((cell) => !cell.hasMine).length;
+  const status = revealedCount === safeCells ? 'won' : 'playing';
+
+  return { ...game, board, status, revealedCount, flaggedCount: countCubeFlags(board) };
+}
+
+function countCubeRevealed(board: CubeBoard): number {
+  return getAllCubeCells(board).filter((cell) => cell.isRevealed && !cell.hasMine).length;
+}
+
+function countCubeFlags(board: CubeBoard): number {
+  return getAllCubeCells(board).filter((cell) => cell.isFlagged).length;
 }
 
 function calculateCubeClues(board: CubeBoard, preset: CubePreset): void {
