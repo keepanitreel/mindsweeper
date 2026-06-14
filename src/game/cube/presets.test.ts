@@ -8,9 +8,14 @@ describe('cube presets', () => {
     expect(CUBE_PRESETS.deep).toMatchObject({ id: 'deep', label: 'Deep Cube', size: 5, hiddenDepth: 3, mines: 80 });
   });
 
+  it('accepts all fixed Cube Mode presets', () => {
+    expect(validateCubePreset(CUBE_PRESETS.starter)).toEqual({ ok: true });
+    expect(validateCubePreset(CUBE_PRESETS.standard)).toEqual({ ok: true });
+    expect(validateCubePreset(CUBE_PRESETS.deep)).toEqual({ ok: true });
+  });
+
   it('rejects presets that cannot keep a first-click safe zone', () => {
-    expect(validateCubePreset({ id: 'starter', label: 'Starter Cube', size: 4, hiddenDepth: 2, mines: 24 })).toEqual({ ok: true });
-    expect(validateCubePreset({ id: 'bad', label: 'Bad Cube', size: 2, hiddenDepth: 1, mines: 20 })).toEqual({
+    expect(validateCubePreset({ id: 'bad', label: 'Bad Cube', size: 3, hiddenDepth: 1, mines: 99 })).toEqual({
       ok: false,
       error: 'Cube preset must leave room for the first-click safe zone.',
     });
