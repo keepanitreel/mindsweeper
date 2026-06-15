@@ -201,19 +201,31 @@ interface CanvasPickOptions {
 
 async function clickCanvasPick(page: Page, canvas: Locator, options: CanvasPickOptions = {}): Promise<string> {
   const { xFraction = 0.5, yFraction = 0.5, button = 'left', previousPick } = options;
+  const pickPattern = /^(front|right|back|left|top|bottom):\d+:\d+$/;
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
 
   await page.mouse.click(box!.x + box!.width * xFraction, box!.y + box!.height * yFraction, { button });
 
-  await expect.poll(() => canvas.getAttribute('data-last-pick')).toMatch(/^(front|right|back|left|top|bottom):\d+:\d+$/);
-  const pick = await canvas.getAttribute('data-last-pick');
-  expect(pick).toMatch(/^(front|right|back|left|top|bottom):\d+:\d+$/);
+  let observedPick = '';
+  await expect
+    .poll(async () => {
+      const pick = await canvas.getAttribute('data-last-pick');
+      if (!pick || !pickPattern.test(pick) || (previousPick && pick === previousPick)) {
+        return '';
+      }
+
+      observedPick = pick;
+      return pick;
+    })
+    .toMatch(pickPattern);
+
+  expect(observedPick).toMatch(pickPattern);
   if (previousPick) {
-    expect(pick).not.toBe(previousPick);
+    expect(observedPick).not.toBe(previousPick);
   }
 
-  return pick!;
+  return observedPick;
 }
 
 async function clickDomCell(cell: Locator): Promise<void> {
