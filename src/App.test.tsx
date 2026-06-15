@@ -130,12 +130,10 @@ describe('Minesweeper app', () => {
 
     await user.click(screen.getByRole('button', { name: /cube mode/i }));
 
-    const cubeStage = document.querySelector<HTMLElement>('.cube-stage');
-    expect(cubeStage).toBeInTheDocument();
+    expect(screen.getByLabelText(/interactive cube board/i)).toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText('Cube difficulty'), 'standard');
-    expect(cubeStage!.style.getPropertyValue('--cube-size')).toBe('10');
-    expect(cubeStage!.style.getPropertyValue('--cube-cell-size')).toBe('clamp(24px, calc((100vw - 160px) / 10), 54px)');
+    expect(screen.getAllByRole('gridcell', { name: /covered cube cell/i })).toHaveLength(6 * 10 * 10);
     expect(screen.getByText('200')).toBeInTheDocument();
   });
 
@@ -148,20 +146,20 @@ describe('Minesweeper app', () => {
     const cubeStage = document.querySelector<HTMLElement>('.cube-stage');
 
     expect(cubeStage).toBeInTheDocument();
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('-24deg');
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-32deg');
+    expect(cubeStage).toHaveAttribute('data-rotation-x', '-24');
+    expect(cubeStage).toHaveAttribute('data-rotation-y', '-32');
 
     await user.keyboard('{ArrowLeft}');
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-122deg');
+    expect(cubeStage).toHaveAttribute('data-rotation-y', '-122');
 
     await user.keyboard('{ArrowRight}');
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-y')).toBe('-32deg');
+    expect(cubeStage).toHaveAttribute('data-rotation-y', '-32');
 
     await user.keyboard('{ArrowUp}');
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('66deg');
+    expect(cubeStage).toHaveAttribute('data-rotation-x', '66');
 
     await user.keyboard('{ArrowDown}');
-    expect(cubeStage!.style.getPropertyValue('--cube-rotate-x')).toBe('-24deg');
+    expect(cubeStage).toHaveAttribute('data-rotation-x', '-24');
   });
 
   it('reveals and flags Cube Mode cells', async () => {
