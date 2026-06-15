@@ -462,11 +462,10 @@ input {
 }
 
 .cube-stage {
-  --cube-face-size: calc(
-    (var(--cube-cell-size) + var(--cube-grid-gap)) * var(--cube-size) - var(--cube-grid-gap) + (var(--cube-face-padding) * 2)
-  );
-  width: var(--cube-face-size);
-  height: var(--cube-face-size);
+  width: min(100%, 720px);
+  height: min(66dvh, 680px);
+  min-height: 360px;
+  position: relative;
   display: grid;
   place-items: center;
   touch-action: none;
@@ -477,61 +476,47 @@ input {
   cursor: grabbing;
 }
 
-.cube-stage-picking .cube-cell {
-  pointer-events: none;
+.cube-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 1px solid rgba(210, 255, 183, 0.2);
+  border-radius: 8px;
+  background: #071a12;
 }
 
-.cube {
-  position: relative;
-  width: var(--cube-face-size);
-  height: var(--cube-face-size);
-  transform-style: preserve-3d;
-  transform: rotateX(var(--cube-rotate-x)) rotateY(var(--cube-rotate-y));
-  transition: transform 180ms ease;
+.cube-stage-fallback .cube-canvas {
+  display: none;
 }
 
-.cube-stage:active .cube {
-  transition: none;
-}
-
-.cube-face {
+.cube-accessible-board {
   position: absolute;
-  inset: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.cube-accessible-board.visible {
+  position: static;
+  width: min(100%, 560px);
+  height: auto;
   display: grid;
-  grid-template-columns: repeat(var(--cube-size), var(--cube-cell-size));
-  grid-auto-rows: var(--cube-cell-size);
-  gap: var(--cube-grid-gap);
-  padding: var(--cube-face-padding);
-  border: 1px solid rgba(210, 255, 183, 0.34);
+  gap: 8px;
+  clip-path: none;
+  white-space: normal;
+}
+
+.cube-accessible-face {
+  display: grid;
+  grid-template-columns: repeat(var(--cube-size, 4), var(--cube-cell-size, 42px));
+  grid-auto-rows: var(--cube-cell-size, 42px);
+  gap: var(--cube-grid-gap, 2px);
+  padding: var(--cube-face-padding, 6px);
+  border: 1px solid rgba(210, 255, 183, 0.24);
+  border-radius: 8px;
   background: rgba(18, 60, 43, 0.94);
-  box-shadow:
-    inset 0 0 24px rgba(255, 255, 255, 0.08),
-    0 0 0 1px rgba(0, 0, 0, 0.22);
-  backface-visibility: hidden;
-}
-
-.cube-face-front {
-  transform: translateZ(calc(var(--cube-face-size) / 2));
-}
-
-.cube-face-back {
-  transform: rotateY(180deg) translateZ(calc(var(--cube-face-size) / 2));
-}
-
-.cube-face-right {
-  transform: rotateY(90deg) translateZ(calc(var(--cube-face-size) / 2));
-}
-
-.cube-face-left {
-  transform: rotateY(-90deg) translateZ(calc(var(--cube-face-size) / 2));
-}
-
-.cube-face-top {
-  transform: rotateX(90deg) translateZ(calc(var(--cube-face-size) / 2));
-}
-
-.cube-face-bottom {
-  transform: rotateX(-90deg) translateZ(calc(var(--cube-face-size) / 2));
 }
 
 .cube-cell {
