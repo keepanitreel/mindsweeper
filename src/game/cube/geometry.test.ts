@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CubeCoordinate, CubeFace, CubeSurfaceCoordinate } from './types';
-import { CUBE_FACES, coordinateKey, getDepthStackCoordinates, getSurfaceNeighbors } from './geometry';
+import { CUBE_FACES, coordinateKey, getSurfaceNeighbors } from './geometry';
 
 type EdgeTransitionCase = {
   label: string;
@@ -202,16 +202,6 @@ describe('cube geometry', () => {
         }
       }
     }
-  });
-
-  it('returns hidden depth stack coordinates behind a surface cell', () => {
-    const surface: CubeSurfaceCoordinate = { face: 'right', row: 2, col: 1 };
-
-    expect(getDepthStackCoordinates(surface, 3)).toEqual([
-      { face: 'right', row: 2, col: 1, depth: 1 },
-      { face: 'right', row: 2, col: 1, depth: 2 },
-      { face: 'right', row: 2, col: 1, depth: 3 },
-    ]);
   });
 
   it('creates stable coordinate keys', () => {

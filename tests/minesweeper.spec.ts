@@ -75,7 +75,7 @@ test('undoes the move that hit a mine', async ({ page }) => {
 
 test('selects Cube Mode and performs a basic cube interaction', async ({ page }) => {
   await page.addInitScript(() => {
-    Math.random = () => 0;
+    Math.random = () => 0.05;
   });
   await page.goto('/');
 
@@ -103,22 +103,20 @@ test('selects Cube Mode and performs a basic cube interaction', async ({ page })
   await expect(page.getByRole('gridcell', { name: getFlaggedCanvasPickLabel(flaggedPick) })).toBeVisible();
 });
 
-test('opens a Cube Mode depth stack after revealing a depth-marked surface cell', async ({ page }) => {
+test('keeps Cube Mode surface-only during play', async ({ page }) => {
   await page.addInitScript(() => {
-    Math.random = () => 0;
+    Math.random = () => 0.05;
   });
   await page.goto('/');
 
   await page.getByRole('button', { name: /cube mode/i }).click();
   await clickDomCell(page.getByRole('gridcell', { name: /covered cube cell front row 2 column 2 surface/i }));
 
-  const revealedDepthCell = page
-    .getByRole('gridcell', { name: /revealed cube cell .* depth mines/i })
-    .filter({ hasText: /[1-3]/ })
-    .first();
-  await clickDomCell(revealedDepthCell);
+  await expect(page.getByLabel('Cube difficulty')).not.toContainText('Deep Cube');
 
-  await expect(page.getByLabel(/depth stack for/i)).toBeVisible();
+  await expect(page.getByText(/^Depth /i)).toHaveCount(0);
+  await expect(page.getByLabel(/depth stack/i)).toHaveCount(0);
+  await expect(page.getByRole('gridcell', { name: /depth mines/i })).toHaveCount(0);
 });
 
 test('renders a nonblank Cube Mode canvas', async ({ page }) => {

@@ -112,7 +112,7 @@ describe('cube board scene helpers', () => {
     const game = createInitialCubeGame(CUBE_PRESETS.starter);
     const covered = game.board.front[0][0][0];
     const flagged = { ...covered, isFlagged: true };
-    const revealed = { ...covered, isRevealed: true, surfaceNeighborMines: 3, depthMineCount: 2 };
+    const revealed = { ...covered, isRevealed: true, surfaceNeighborMines: 3 };
 
     const coveredTexture = createCellTexture(covered);
     const flaggedTexture = createCellTexture(flagged);

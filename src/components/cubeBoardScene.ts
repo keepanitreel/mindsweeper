@@ -269,16 +269,6 @@ function drawCellContent(context: CanvasRenderingContext2D, cell: CubeCell): voi
     context.fillStyle = getNumberColor(cell.surfaceNeighborMines);
     context.fillText(String(cell.surfaceNeighborMines), TEXTURE_SIZE / 2, TEXTURE_SIZE / 2);
   }
-
-  if (cell.depth === 0 && cell.depthMineCount > 0) {
-    context.fillStyle = '#f3d34a';
-    context.beginPath();
-    context.arc(TEXTURE_SIZE - 20, TEXTURE_SIZE - 20, 16, 0, Math.PI * 2);
-    context.fill();
-    context.fillStyle = '#102116';
-    context.font = '800 22px system-ui, sans-serif';
-    context.fillText(String(cell.depthMineCount), TEXTURE_SIZE - 20, TEXTURE_SIZE - 18);
-  }
 }
 
 function getNumberColor(value: number): string {

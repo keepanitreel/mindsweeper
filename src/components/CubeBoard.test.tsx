@@ -38,7 +38,6 @@ describe('CubeBoard Three.js bridge', () => {
   let onRotate: Mock<(rotation: CubeRotation) => void>;
   let onCellPrimary: Mock<(cell: CubeCell) => void>;
   let onCellFlag: Mock<(cell: CubeCell) => void>;
-  let onPeek: Mock<(cell: CubeCell | null) => void>;
 
   beforeAll(() => {
     window.PointerEvent = TestPointerEvent as typeof PointerEvent;
@@ -64,7 +63,6 @@ describe('CubeBoard Three.js bridge', () => {
     onRotate = vi.fn<(rotation: CubeRotation) => void>();
     onCellPrimary = vi.fn<(cell: CubeCell) => void>();
     onCellFlag = vi.fn<(cell: CubeCell) => void>();
-    onPeek = vi.fn<(cell: CubeCell | null) => void>();
     sceneMock.controller = {
       updateGame: vi.fn(),
       updateRotation: vi.fn(),
@@ -168,14 +166,14 @@ describe('CubeBoard Three.js bridge', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it('updates peek from raycast hover when no drag is active', () => {
+  it('updates canvas pick metadata from raycast hover when no drag is active', () => {
     sceneMock.controller!.pickCell.mockReturnValue({ face: 'top', row: 0, col: 2, depth: 0 });
     renderBoard();
 
     const canvas = screen.getByLabelText(/interactive cube board/i);
     fireEvent.pointerMove(canvas, { clientX: 30, clientY: 40 });
 
-    expect(onPeek).toHaveBeenCalledWith(game.board.top[0][0][2]);
+    expect(canvas).toHaveAttribute('data-last-pick', 'top:0:2');
   });
 
   it('rotates after threshold movement and does not reveal the drag-start cell', () => {
@@ -251,7 +249,6 @@ describe('CubeBoard Three.js bridge', () => {
         onRotate={onRotate}
         onCellPrimary={onCellPrimary}
         onCellFlag={onCellFlag}
-        onPeek={onPeek}
       />
     );
   }
