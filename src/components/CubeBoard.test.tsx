@@ -1,3 +1,4 @@
+import { Profiler } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
@@ -5,7 +6,7 @@ import { createInitialCubeGame } from '../game/cube/engine';
 import { CUBE_PRESETS } from '../game/cube/presets';
 import type { CubeCell, CubeGameState } from '../game/cube/types';
 import CubeBoard, { type CubeRotation } from './CubeBoard';
-import type { CubeBoardSceneController } from './cubeBoardScene';
+import { createCubeBoardScene, type CubeBoardSceneController } from './cubeBoardScene';
 
 type MockScene = {
   [Key in keyof CubeBoardSceneController]: ReturnType<typeof vi.fn>;
@@ -21,6 +22,7 @@ vi.mock('./cubeBoardScene', () => ({
 
 const originalPointerEvent = window.PointerEvent;
 const originalWebGLRenderingContext = window.WebGLRenderingContext;
+const originalWebGL2RenderingContext = window.WebGL2RenderingContext;
 
 class TestPointerEvent extends MouseEvent {
   pointerId: number;
@@ -40,10 +42,7 @@ describe('CubeBoard Three.js bridge', () => {
 
   beforeAll(() => {
     window.PointerEvent = TestPointerEvent as typeof PointerEvent;
-    Object.defineProperty(window, 'WebGLRenderingContext', {
-      configurable: true,
-      value: class TestWebGLRenderingContext {},
-    });
+    setWebGLSupport(true);
   });
 
   afterAll(() => {
@@ -52,9 +51,15 @@ describe('CubeBoard Three.js bridge', () => {
       configurable: true,
       value: originalWebGLRenderingContext,
     });
+    Object.defineProperty(window, 'WebGL2RenderingContext', {
+      configurable: true,
+      value: originalWebGL2RenderingContext,
+    });
   });
 
   beforeEach(() => {
+    setWebGLSupport(true);
+    vi.mocked(createCubeBoardScene).mockClear();
     game = createInitialCubeGame(CUBE_PRESETS.starter);
     onRotate = vi.fn<(rotation: CubeRotation) => void>();
     onCellPrimary = vi.fn<(cell: CubeCell) => void>();
@@ -68,6 +73,58 @@ describe('CubeBoard Three.js bridge', () => {
       render: vi.fn(),
       dispose: vi.fn(),
     };
+  });
+
+  it('initializes the scene on mount with game, rotation, and stage size', () => {
+    renderBoard();
+
+    const canvas = screen.getByLabelText(/interactive cube board/i);
+
+    expect(createCubeBoardScene).toHaveBeenCalledWith(canvas);
+    expect(sceneMock.controller!.updateGame).toHaveBeenCalledTimes(1);
+    expect(sceneMock.controller!.updateGame).toHaveBeenCalledWith(game);
+    expect(sceneMock.controller!.updateRotation).toHaveBeenCalledTimes(1);
+    expect(sceneMock.controller!.updateRotation).toHaveBeenCalledWith({ x: -24, y: -32 });
+    expect(sceneMock.controller!.resize).toHaveBeenCalledWith(600, 600);
+  });
+
+  it('updates the scene when a new game is rendered', () => {
+    const view = renderBoard();
+    const nextGame = createInitialCubeGame(CUBE_PRESETS.standard);
+    sceneMock.controller!.updateGame.mockClear();
+
+    view.rerender(renderBoardElement({ game: nextGame }));
+
+    expect(sceneMock.controller!.updateGame).toHaveBeenCalledTimes(1);
+    expect(sceneMock.controller!.updateGame).toHaveBeenCalledWith(nextGame);
+  });
+
+  it('updates the scene when a new rotation is rendered', () => {
+    const view = renderBoard();
+    const nextRotation = { x: 0, y: 90 };
+    sceneMock.controller!.updateRotation.mockClear();
+
+    view.rerender(renderBoardElement({ rotation: nextRotation }));
+
+    expect(sceneMock.controller!.updateRotation).toHaveBeenCalledTimes(1);
+    expect(sceneMock.controller!.updateRotation).toHaveBeenCalledWith(nextRotation);
+  });
+
+  it('disposes the scene on unmount', () => {
+    const view = renderBoard();
+
+    view.unmount();
+
+    expect(sceneMock.controller!.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the accessible fallback without creating a scene when WebGL is unavailable', () => {
+    setWebGLSupport(false);
+
+    renderBoard();
+
+    expect(createCubeBoardScene).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/accessible cube board/i)).toHaveClass('visible');
   });
 
   it('routes a short canvas click to the raycasted cell', () => {
@@ -87,9 +144,11 @@ describe('CubeBoard Three.js bridge', () => {
     renderBoard();
 
     const canvas = screen.getByLabelText(/interactive cube board/i);
-    fireEvent.contextMenu(canvas, { clientX: 30, clientY: 40 });
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 });
+    fireEvent(canvas, event);
 
     expect(onCellFlag).toHaveBeenCalledWith(game.board.right[0][2][3]);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('updates peek from raycast hover when no drag is active', () => {
@@ -116,6 +175,33 @@ describe('CubeBoard Three.js bridge', () => {
     expect(onRotate).toHaveBeenLastCalledWith({ x: 0, y: 0 });
   });
 
+  it('ignores drag movement from a different pointer', () => {
+    renderBoard();
+
+    const canvas = screen.getByLabelText(/interactive cube board/i);
+    fireEvent.pointerDown(canvas, { button: 0, pointerId: 1, clientX: 20, clientY: 20 });
+    fireEvent.pointerMove(canvas, { pointerId: 2, clientX: 50, clientY: 20 });
+    fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: 20, clientY: 20 });
+
+    expect(onRotate).not.toHaveBeenCalled();
+  });
+
+  it('does not rerender for repeated equivalent canvas picks', () => {
+    const onRender = vi.fn();
+    sceneMock.controller!.pickCell.mockImplementation(() => ({ face: 'top', row: 0, col: 2, depth: 0 }));
+    render(<Profiler id="cube-board" onRender={onRender}>{renderBoardElement()}</Profiler>);
+
+    const canvas = screen.getByLabelText(/interactive cube board/i);
+    onRender.mockClear();
+
+    fireEvent.pointerMove(canvas, { clientX: 30, clientY: 40 });
+    expect(canvas).toHaveAttribute('data-last-pick', 'top:0:2');
+
+    fireEvent.pointerMove(canvas, { clientX: 31, clientY: 41 });
+    expect(canvas).toHaveAttribute('data-last-pick', 'top:0:2');
+    expect(onRender).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps real grid buttons for non-pointer interaction', () => {
     renderBoard();
 
@@ -124,16 +210,31 @@ describe('CubeBoard Three.js bridge', () => {
     expect(onCellPrimary).toHaveBeenCalledWith(game.board.front[0][1][1]);
   });
 
-  function renderBoard() {
-    render(
+  function renderBoard(props: Partial<{ game: CubeGameState; rotation: CubeRotation }> = {}) {
+    return render(renderBoardElement(props));
+  }
+
+  function renderBoardElement({ game: boardGame = game, rotation = { x: -24, y: -32 } }: Partial<{ game: CubeGameState; rotation: CubeRotation }> = {}) {
+    return (
       <CubeBoard
-        game={game}
-        rotation={{ x: -24, y: -32 }}
+        game={boardGame}
+        rotation={rotation}
         onRotate={onRotate}
         onCellPrimary={onCellPrimary}
         onCellFlag={onCellFlag}
         onPeek={onPeek}
-      />,
+      />
     );
   }
 });
+
+function setWebGLSupport(enabled: boolean) {
+  Object.defineProperty(window, 'WebGLRenderingContext', {
+    configurable: true,
+    value: enabled ? class TestWebGLRenderingContext {} : undefined,
+  });
+  Object.defineProperty(window, 'WebGL2RenderingContext', {
+    configurable: true,
+    value: enabled ? class TestWebGL2RenderingContext {} : undefined,
+  });
+}

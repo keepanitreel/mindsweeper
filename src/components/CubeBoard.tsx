@@ -32,6 +32,7 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<CubeBoardSceneController | null>(null);
   const pointerState = useRef<PointerDragState | null>(null);
+  const lastCanvasPickKey = useRef('');
   const [canvasFailed, setCanvasFailed] = useState(false);
   const [lastCanvasPick, setLastCanvasPick] = useState<CubeSurfacePick | null>(null);
   const boardStyle = {
@@ -62,8 +63,6 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
     }
 
     sceneRef.current = scene;
-    scene.updateGame(game);
-    scene.updateRotation(rotation);
 
     const resize = () => {
       const rect = stage.getBoundingClientRect();
@@ -108,6 +107,10 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
     const active = pointerState.current;
 
     if (active) {
+      if (active.pointerId !== event.pointerId) {
+        return;
+      }
+
       if (hasPointerDragged(active.start, current)) {
         active.didDrag = true;
         onRotate(getDragRotation(active, current));
@@ -158,12 +161,22 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
 
   function pickCell(clientX: number, clientY: number): CubeCell | null {
     const pick = sceneRef.current?.pickCell(clientX, clientY) ?? null;
-    setLastCanvasPick(pick);
+    updateLastCanvasPick(pick);
     if (!pick) {
       return null;
     }
 
     return game.board[pick.face]?.[0]?.[pick.row]?.[pick.col] ?? null;
+  }
+
+  function updateLastCanvasPick(pick: CubeSurfacePick | null) {
+    const key = getPickKey(pick);
+    if (lastCanvasPickKey.current === key) {
+      return;
+    }
+
+    lastCanvasPickKey.current = key;
+    setLastCanvasPick(pick);
   }
 
   return (
@@ -211,6 +224,10 @@ function hasWebGLSupport(canvas: HTMLCanvasElement): boolean {
   const view = canvas.ownerDocument.defaultView;
 
   return Boolean(view?.WebGLRenderingContext || view?.WebGL2RenderingContext);
+}
+
+function getPickKey(pick: CubeSurfacePick | null): string {
+  return pick ? `${pick.face}:${pick.row}:${pick.col}` : '';
 }
 
 function getCubeCellSize(cubeSize: number): string {
