@@ -1,8 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
-import { useRef } from 'react';
 import { CUBE_FACES } from '../game/cube/geometry';
-import type { CubeCell, CubeFace, CubeGameState } from '../game/cube/types';
+import type { CubeCell, CubeGameState } from '../game/cube/types';
 import CubeCellButton from './CubeCellButton';
+import { hasPointerDragged, snapCubeRotation, type CubeSurfacePick, type PointerPosition } from './cubeBoardPicking';
+import { createCubeBoardScene, type CubeBoardSceneController } from './cubeBoardScene';
 
 export interface CubeRotation {
   x: number;
@@ -18,8 +20,20 @@ interface CubeBoardProps {
   onPeek: (cell: CubeCell | null) => void;
 }
 
+interface PointerDragState {
+  pointerId: number;
+  start: PointerPosition;
+  rotation: CubeRotation;
+  didDrag: boolean;
+}
+
 export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onCellFlag, onPeek }: CubeBoardProps) {
-  const dragStart = useRef<{ x: number; y: number; rotation: CubeRotation } | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const sceneRef = useRef<CubeBoardSceneController | null>(null);
+  const pointerState = useRef<PointerDragState | null>(null);
+  const [canvasFailed, setCanvasFailed] = useState(false);
+  const [lastCanvasPick, setLastCanvasPick] = useState<CubeSurfacePick | null>(null);
   const boardStyle = {
     '--cube-size': game.preset.size,
     '--cube-cell-size': getCubeCellSize(game.preset.size),
@@ -27,83 +41,155 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
     '--cube-rotate-y': `${rotation.y}deg`,
   } as CSSProperties;
 
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>) {
-    const isButtonTarget = event.target instanceof Element && event.target.closest('button');
-    if (event.button !== 0 || getCellFromPoint(event.currentTarget, game, event.clientX, event.clientY) || isButtonTarget) {
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const stage = stageRef.current;
+    if (!canvas || !stage) {
       return;
     }
 
-    dragStart.current = { x: event.clientX, y: event.clientY, rotation };
+    if (!hasWebGLSupport(canvas)) {
+      setCanvasFailed(true);
+      return;
+    }
+
+    let scene: CubeBoardSceneController;
+    try {
+      scene = createCubeBoardScene(canvas);
+    } catch {
+      setCanvasFailed(true);
+      return;
+    }
+
+    sceneRef.current = scene;
+    scene.updateGame(game);
+    scene.updateRotation(rotation);
+
+    const resize = () => {
+      const rect = stage.getBoundingClientRect();
+      scene.resize(rect.width || 600, rect.height || 600);
+    };
+    resize();
+
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
+    observer?.observe(stage);
+
+    return () => {
+      observer?.disconnect();
+      scene.dispose();
+      sceneRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    sceneRef.current?.updateGame(game);
+  }, [game]);
+
+  useEffect(() => {
+    sceneRef.current?.updateRotation(rotation);
+  }, [rotation]);
+
+  function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    pointerState.current = {
+      pointerId: event.pointerId,
+      start: { x: event.clientX, y: event.clientY },
+      rotation,
+      didDrag: false,
+    };
     event.currentTarget.setPointerCapture?.(event.pointerId);
   }
 
-  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!dragStart.current) {
+  function handlePointerMove(event: PointerEvent<HTMLCanvasElement>) {
+    const current = { x: event.clientX, y: event.clientY };
+    const active = pointerState.current;
+
+    if (active) {
+      if (hasPointerDragged(active.start, current)) {
+        active.didDrag = true;
+        onRotate(getDragRotation(active, current));
+      }
       return;
     }
 
-    const deltaX = event.clientX - dragStart.current.x;
-    const deltaY = event.clientY - dragStart.current.y;
-    onRotate({
-      x: dragStart.current.rotation.x - deltaY * 0.35,
-      y: dragStart.current.rotation.y + deltaX * 0.35,
-    });
+    const cell = pickCell(event.clientX, event.clientY);
+    onPeek(cell);
   }
 
-  function handlePointerUp() {
-    dragStart.current = null;
-  }
-
-  function handleClickCapture(event: MouseEvent<HTMLDivElement>) {
-    if (event.detail === 0) {
+  function handlePointerUp(event: PointerEvent<HTMLCanvasElement>) {
+    const active = pointerState.current;
+    if (!active || active.pointerId !== event.pointerId) {
       return;
     }
 
-    const cell = getCellFromPoint(event.currentTarget, game, event.clientX, event.clientY);
+    pointerState.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    const current = { x: event.clientX, y: event.clientY };
+
+    if (active.didDrag || hasPointerDragged(active.start, current)) {
+      onRotate(snapCubeRotation(getDragRotation(active, current)));
+      return;
+    }
+
+    const cell = pickCell(event.clientX, event.clientY);
+    if (cell) {
+      onCellPrimary(cell);
+    }
+  }
+
+  function handlePointerCancel(event: PointerEvent<HTMLCanvasElement>) {
+    if (pointerState.current?.pointerId === event.pointerId) {
+      pointerState.current = null;
+    }
+  }
+
+  function handleContextMenu(event: MouseEvent<HTMLCanvasElement>) {
+    const cell = pickCell(event.clientX, event.clientY);
     if (!cell) {
       return;
     }
 
     event.preventDefault();
-    event.stopPropagation();
-    onCellPrimary(cell);
-  }
-
-  function handleContextMenuCapture(event: MouseEvent<HTMLDivElement>) {
-    const cell = getCellFromPoint(event.currentTarget, game, event.clientX, event.clientY);
-    if (!cell) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
     onCellFlag(cell);
   }
 
-  function handlePointerMoveCapture(event: PointerEvent<HTMLDivElement>) {
-    if (dragStart.current) {
-      return;
+  function pickCell(clientX: number, clientY: number): CubeCell | null {
+    const pick = sceneRef.current?.pickCell(clientX, clientY) ?? null;
+    setLastCanvasPick(pick);
+    if (!pick) {
+      return null;
     }
 
-    onPeek(getCellFromPoint(event.currentTarget, game, event.clientX, event.clientY));
+    return game.board[pick.face]?.[0]?.[pick.row]?.[pick.col] ?? null;
   }
 
   return (
     <div
-      className="cube-stage"
+      className={`cube-stage ${canvasFailed ? 'cube-stage-fallback' : ''}`}
+      data-rotation-x={rotation.x}
+      data-rotation-y={rotation.y}
       style={boardStyle}
-      onPointerDown={handlePointerDown}
-      onPointerMoveCapture={handlePointerMoveCapture}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      ref={stageRef}
       onPointerLeave={() => onPeek(null)}
-      onClickCapture={handleClickCapture}
-      onContextMenuCapture={handleContextMenuCapture}
     >
-      <div className="cube" aria-label={`${game.preset.label} cube board`}>
+      <canvas
+        className="cube-canvas"
+        ref={canvasRef}
+        aria-label={`${game.preset.label} interactive cube board`}
+        data-last-pick={lastCanvasPick ? `${lastCanvasPick.face}:${lastCanvasPick.row}:${lastCanvasPick.col}` : ''}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onContextMenu={handleContextMenu}
+      />
+
+      <div className={`cube-accessible-board ${canvasFailed ? 'visible' : ''}`} aria-label={`${game.preset.label} accessible cube board`}>
         {CUBE_FACES.map((face) => (
-          <div className={`cube-face cube-face-${face}`} role="grid" aria-label={`${face} cube face`} key={face}>
+          <div className="cube-accessible-face" role="grid" aria-label={`${face} cube face`} key={face}>
             {game.board[face][0].flat().map((cell) => (
               <CubeCellButton key={cell.id} cell={cell} onPrimary={onCellPrimary} onFlag={onCellFlag} onPeek={onPeek} />
             ))}
@@ -114,85 +200,17 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   );
 }
 
-function getCellFromPoint(stage: HTMLDivElement, game: CubeGameState, clientX: number, clientY: number): CubeCell | null {
-  const face = getFaceFromPoint(stage, clientX, clientY);
-  const faceName = face ? getFaceName(face) : null;
-  const localPoint = face ? getFaceLocalPoint(face, clientX, clientY) : null;
-
-  if (!face || !faceName || !localPoint) {
-    return null;
-  }
-
-  const cell = face?.querySelector<HTMLElement>('.cube-cell');
-  if (!cell) {
-    return null;
-  }
-
-  const faceStyle = getComputedStyle(face);
-  const gridX = localPoint.x - (parseCssPixel(faceStyle.paddingLeft) ?? 0);
-  const gridY = localPoint.y - (parseCssPixel(faceStyle.paddingTop) ?? 0);
-  const strideX = cell.offsetWidth + (parseCssPixel(faceStyle.columnGap) ?? 0);
-  const strideY = cell.offsetHeight + (parseCssPixel(faceStyle.rowGap) ?? 0);
-  const col = Math.floor(gridX / strideX);
-  const row = Math.floor(gridY / strideY);
-  const cellX = gridX - col * strideX;
-  const cellY = gridY - row * strideY;
-
-  if (row < 0 || row >= game.preset.size || col < 0 || col >= game.preset.size) {
-    return null;
-  }
-
-  if (cellX < 0 || cellX > cell.offsetWidth || cellY < 0 || cellY > cell.offsetHeight) {
-    return null;
-  }
-
-  return game.board[faceName][0][row][col];
+function getDragRotation(active: PointerDragState, current: PointerPosition): CubeRotation {
+  return {
+    x: active.rotation.x - (current.y - active.start.y) * 0.35,
+    y: active.rotation.y + (current.x - active.start.x) * 0.35,
+  };
 }
 
-function getFaceFromPoint(stage: HTMLDivElement, clientX: number, clientY: number): HTMLElement | null {
-  const elementFromPoint = stage.ownerDocument.elementFromPoint;
-  if (!elementFromPoint) {
-    return null;
-  }
+function hasWebGLSupport(canvas: HTMLCanvasElement): boolean {
+  const view = canvas.ownerDocument.defaultView;
 
-  stage.classList.add('cube-stage-picking');
-
-  try {
-    const element = elementFromPoint.call(stage.ownerDocument, clientX, clientY);
-    const face = element instanceof Element ? element.closest<HTMLElement>('.cube-face') : null;
-    return face && stage.contains(face) ? face : null;
-  } finally {
-    stage.classList.remove('cube-stage-picking');
-  }
-}
-
-function getFaceName(face: HTMLElement): CubeFace | null {
-  return CUBE_FACES.find((cubeFace) => face.classList.contains(`cube-face-${cubeFace}`)) ?? null;
-}
-
-function getFaceLocalPoint(face: HTMLElement, clientX: number, clientY: number): { x: number; y: number } | null {
-  const view = face.ownerDocument.defaultView;
-  if (!view) {
-    return null;
-  }
-
-  let point: { x: number; y: number } | null = null;
-  face.addEventListener(
-    'mousemove',
-    (event) => {
-      point = { x: event.offsetX, y: event.offsetY };
-      event.stopImmediatePropagation();
-    },
-    { capture: true, once: true },
-  );
-  face.dispatchEvent(new view.MouseEvent('mousemove', { clientX, clientY, bubbles: false, view }));
-
-  return point;
-}
-
-function parseCssPixel(value: string): number | null {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Boolean(view?.WebGLRenderingContext || view?.WebGL2RenderingContext);
 }
 
 function getCubeCellSize(cubeSize: number): string {
