@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent, PointerEvent } from 'react';
+import type { CSSProperties, FocusEvent, MouseEvent, PointerEvent } from 'react';
 import { CUBE_FACES } from '../game/cube/geometry';
 import type { CubeCell, CubeGameState } from '../game/cube/types';
 import CubeCellButton from './CubeCellButton';
@@ -23,6 +23,7 @@ interface CubeBoardProps {
 interface PointerDragState {
   pointerId: number;
   start: PointerPosition;
+  current: PointerPosition;
   rotation: CubeRotation;
   didDrag: boolean;
 }
@@ -34,6 +35,7 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   const pointerState = useRef<PointerDragState | null>(null);
   const lastCanvasPickKey = useRef('');
   const [canvasFailed, setCanvasFailed] = useState(false);
+  const [keyboardBoardVisible, setKeyboardBoardVisible] = useState(false);
   const [lastCanvasPick, setLastCanvasPick] = useState<CubeSurfacePick | null>(null);
   const boardStyle = {
     '--cube-size': game.preset.size,
@@ -88,14 +90,20 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
     sceneRef.current?.updateRotation(rotation);
   }, [rotation]);
 
+  const accessibleBoardClassName = `cube-accessible-board ${
+    canvasFailed ? 'visible' : keyboardBoardVisible ? 'keyboard-visible' : ''
+  }`.trim();
+
   function handlePointerDown(event: PointerEvent<HTMLCanvasElement>) {
     if (event.button !== 0) {
       return;
     }
 
+    const start = { x: event.clientX, y: event.clientY };
     pointerState.current = {
       pointerId: event.pointerId,
-      start: { x: event.clientX, y: event.clientY },
+      start,
+      current: start,
       rotation,
       didDrag: false,
     };
@@ -111,6 +119,7 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
         return;
       }
 
+      active.current = current;
       if (hasPointerDragged(active.start, current)) {
         active.didDrag = true;
         onRotate(getDragRotation(active, current));
@@ -144,8 +153,22 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
   }
 
   function handlePointerCancel(event: PointerEvent<HTMLCanvasElement>) {
-    if (pointerState.current?.pointerId === event.pointerId) {
-      pointerState.current = null;
+    const active = pointerState.current;
+    if (!active || active.pointerId !== event.pointerId) {
+      return;
+    }
+
+    pointerState.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    if (active.didDrag) {
+      onRotate(snapCubeRotation(getDragRotation(active, active.current)));
+    }
+  }
+
+  function handleAccessibleBoardBlur(event: FocusEvent<HTMLDivElement>) {
+    const nextTarget = event.relatedTarget;
+    if (!nextTarget || !event.currentTarget.contains(nextTarget as Node)) {
+      setKeyboardBoardVisible(false);
     }
   }
 
@@ -200,7 +223,12 @@ export default function CubeBoard({ game, rotation, onRotate, onCellPrimary, onC
         onContextMenu={handleContextMenu}
       />
 
-      <div className={`cube-accessible-board ${canvasFailed ? 'visible' : ''}`} aria-label={`${game.preset.label} accessible cube board`}>
+      <div
+        className={accessibleBoardClassName}
+        aria-label={`${game.preset.label} accessible cube board`}
+        onFocusCapture={() => setKeyboardBoardVisible(true)}
+        onBlurCapture={handleAccessibleBoardBlur}
+      >
         {CUBE_FACES.map((face) => (
           <div className="cube-accessible-face" role="grid" aria-label={`${face} cube face`} key={face}>
             {game.board[face][0].flat().map((cell) => (

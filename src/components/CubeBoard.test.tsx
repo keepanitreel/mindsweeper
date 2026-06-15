@@ -127,6 +127,23 @@ describe('CubeBoard Three.js bridge', () => {
     expect(screen.getByLabelText(/accessible cube board/i)).toHaveClass('visible');
   });
 
+  it('reveals the accessible grid while keyboard focus is inside it', () => {
+    renderBoard();
+
+    const accessibleBoard = screen.getByLabelText(/accessible cube board/i);
+    const cell = screen.getByRole('gridcell', { name: /covered cube cell front row 2 column 2 surface/i });
+
+    expect(accessibleBoard).not.toHaveClass('keyboard-visible');
+
+    fireEvent.focus(cell);
+
+    expect(accessibleBoard).toHaveClass('keyboard-visible');
+
+    fireEvent.blur(cell, { relatedTarget: document.body });
+
+    expect(accessibleBoard).not.toHaveClass('keyboard-visible');
+  });
+
   it('routes a short canvas click to the raycasted cell', () => {
     sceneMock.controller!.pickCell.mockReturnValue({ face: 'front', row: 1, col: 1, depth: 0 });
     renderBoard();
@@ -171,6 +188,18 @@ describe('CubeBoard Three.js bridge', () => {
     fireEvent.pointerUp(canvas, { button: 0, pointerId: 1, clientX: 50, clientY: 20 });
 
     expect(onCellPrimary).not.toHaveBeenCalled();
+    expect(onRotate).toHaveBeenCalledWith({ x: -24, y: -21.5 });
+    expect(onRotate).toHaveBeenLastCalledWith({ x: 0, y: 0 });
+  });
+
+  it('snaps rotation when a canvas drag is canceled', () => {
+    renderBoard();
+
+    const canvas = screen.getByLabelText(/interactive cube board/i);
+    fireEvent.pointerDown(canvas, { button: 0, pointerId: 1, clientX: 20, clientY: 20 });
+    fireEvent.pointerMove(canvas, { pointerId: 1, clientX: 50, clientY: 20 });
+    fireEvent.pointerCancel(canvas, { pointerId: 1 });
+
     expect(onRotate).toHaveBeenCalledWith({ x: -24, y: -21.5 });
     expect(onRotate).toHaveBeenLastCalledWith({ x: 0, y: 0 });
   });
