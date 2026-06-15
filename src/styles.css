@@ -489,6 +489,19 @@ input {
   display: none;
 }
 
+.cube-stage-fallback {
+  height: auto;
+  max-height: min(72dvh, 680px);
+  place-items: start center;
+  overflow: auto;
+  touch-action: auto;
+  cursor: default;
+}
+
+.cube-stage-fallback:active {
+  cursor: default;
+}
+
 .cube-accessible-board {
   position: absolute;
   width: 1px;
