@@ -25,6 +25,7 @@ export function createCubeBoardScene(canvas: HTMLCanvasElement): CubeBoardSceneC
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   let cubeGroup = new THREE.Group();
+  let currentRotation: CubeRotation = { x: 0, y: 0 };
 
   scene.background = new THREE.Color('#071a12');
   camera.position.set(0, 0, 8);
@@ -35,13 +36,14 @@ export function createCubeBoardScene(canvas: HTMLCanvasElement): CubeBoardSceneC
     scene.remove(cubeGroup);
     disposeObject3D(cubeGroup);
     cubeGroup = buildCubeCellGroup(game);
+    applyCubeRotation(cubeGroup, currentRotation);
     scene.add(cubeGroup);
     render();
   }
 
   function updateRotation(rotation: CubeRotation) {
-    cubeGroup.rotation.x = THREE.MathUtils.degToRad(rotation.x);
-    cubeGroup.rotation.y = THREE.MathUtils.degToRad(rotation.y);
+    currentRotation = { ...rotation };
+    applyCubeRotation(cubeGroup, currentRotation);
     render();
   }
 
@@ -64,9 +66,7 @@ export function createCubeBoardScene(canvas: HTMLCanvasElement): CubeBoardSceneC
     pointer.y = -(((clientY - rect.top) / rect.height) * 2 - 1);
     raycaster.setFromCamera(pointer, camera);
 
-    const hit = raycaster
-      .intersectObjects(cubeGroup.children, true)
-      .find((intersection) => isCubeCellUserData(intersection.object.userData));
+    const hit = raycaster.intersectObjects(cubeGroup.children, true)[0];
 
     return hit && isCubeCellUserData(hit.object.userData) ? toSurfacePick(hit.object.userData) : null;
   }
@@ -91,6 +91,7 @@ export function buildCubeCellGroup(game: CubeGameState): THREE.Group {
     const faceGroup = new THREE.Group();
     faceGroup.name = `cube-face-${face}`;
     positionFaceGroup(faceGroup, face);
+    faceGroup.add(createFaceBackingMesh(face));
 
     const cellSize = (FACE_SIZE - CELL_GAP * (game.preset.size - 1)) / game.preset.size;
     for (let row = 0; row < game.preset.size; row += 1) {
@@ -115,6 +116,22 @@ export function buildCubeCellGroup(game: CubeGameState): THREE.Group {
   }
 
   return root;
+}
+
+function createFaceBackingMesh(face: CubeFace): THREE.Mesh {
+  const geometry = new THREE.PlaneGeometry(FACE_SIZE, FACE_SIZE);
+  const material = new THREE.MeshBasicMaterial({
+    depthWrite: false,
+    opacity: 0,
+    side: THREE.DoubleSide,
+    transparent: true,
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+
+  mesh.name = `cube-face-${face}-backing`;
+  mesh.userData = { kind: 'cube-face-backing', face };
+
+  return mesh;
 }
 
 export function createCellTexture(cell: CubeCell): THREE.CanvasTexture {
@@ -186,6 +203,11 @@ function positionFaceGroup(group: THREE.Group, face: CubeFace): void {
     group.position.y = -FACE_HALF;
     group.rotation.x = Math.PI / 2;
   }
+}
+
+function applyCubeRotation(group: THREE.Group, rotation: CubeRotation): void {
+  group.rotation.x = THREE.MathUtils.degToRad(rotation.x);
+  group.rotation.y = THREE.MathUtils.degToRad(rotation.y);
 }
 
 function toSurfacePick(userData: { face: CubeFace; row: number; col: number; depth: 0 }): CubeSurfacePick {
